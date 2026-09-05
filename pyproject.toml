@@ -5,7 +5,7 @@ requires-python = ">=3.13,<3.14"
 
 [dependency-groups]
 dev = [
-  "coverage[toml]==7.10.7",
+  "coverage[toml]==7.16.0",
   "pytest==8.4.2",
   "pytest-cov==7.0.0",
   "ruff==0.12.12",
