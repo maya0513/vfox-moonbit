@@ -8,7 +8,7 @@ dev = [
   "coverage[toml]==7.10.7",
   "pytest==8.4.2",
   "pytest-cov==7.0.0",
-  "ruff==0.12.12",
+  "ruff==0.16.5",
 ]
 
 [tool.uv]
