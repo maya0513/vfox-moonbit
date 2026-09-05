@@ -1,0 +1,71 @@
+min_version = "2026.5.12"
+
+[settings]
+experimental = true
+lockfile = true
+
+[env]
+PYTHONPATH = "."
+
+[tools]
+actionlint = "1.7.12"
+"conda:gcc" = "16.2.0"
+"conda:lua" = ["5.1.5", "5.4.8"]
+"conda:luarocks" = "3.13.0"
+python = "3.13.15"
+stylua = "2.5.2"
+uv = "0.12.10"
+vfox = ["0.4.0", "1.0.11"]
+zizmor = "1.30.0"
+
+[tasks.bootstrap]
+description = "Install locked Python and Lua test dependencies"
+run = "bash scripts/bootstrap.sh"
+
+[tasks."fmt:check"]
+description = "Check Lua and Python formatting"
+run = [
+  "stylua --check metadata.lua hooks lib/moonbit_*.lua tests/lua",
+  "uv run ruff format --check scripts tests/python",
+]
+
+[tasks.lint]
+description = "Run static analysis and workflow security checks"
+run = [
+  ".rocks/5.4/bin/luacheck metadata.lua hooks lib/moonbit_*.lua tests/lua",
+  "uv run ruff check scripts tests/python",
+  "actionlint .github/workflows/*.yml",
+  "zizmor --pedantic .github/workflows",
+  "python scripts/check_repository.py",
+]
+
+[tasks."test:unit"]
+description = "Run Lua 5.1, Lua 5.4, and Python unit tests"
+run = "bash scripts/test-unit.sh"
+
+[tasks.coverage]
+description = "Enforce first-party Lua and Python coverage at 95%"
+run = "bash scripts/coverage.sh"
+
+[tasks.e2e]
+description = "Run the real-download MoonBit integration test through mise"
+run = "python scripts/e2e.py --backend mise"
+
+[tasks.package]
+description = "Build a deterministic local plugin release bundle"
+run = "python scripts/package_plugin.py"
+
+[tasks."update:check"]
+description = "Validate immutable release manifests and vendored source"
+run = "python scripts/update_latest.py --check"
+
+[tasks.ci]
+description = "Run the same deterministic checks as GitHub Actions"
+run = [
+  "mise run fmt:check",
+  "mise run lint",
+  "mise run test:unit",
+  "mise run coverage",
+  "mise run update:check",
+  "mise run package",
+]

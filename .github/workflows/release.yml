@@ -1,0 +1,71 @@
+name: Release plugin
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions: {}
+
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: verify, package, and attest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write # Publish the immutable tag release and movable manifest asset.
+      id-token: write # Mint the short-lived Sigstore identity for provenance.
+      attestations: write # Store provenance for the plugin ZIP.
+      artifact-metadata: write # Register attested artifact metadata with GitHub.
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned development tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.9.1
+          install: true
+          cache: false
+          experimental: true
+
+      - name: Bootstrap and verify release source
+        run: |
+          mise run bootstrap
+          mise run ci
+          python scripts/check_repository.py --require-origin
+
+      - name: Build deterministic release assets
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python scripts/package_plugin.py --version "$version" --output dist
+
+      - name: Attest the plugin ZIP
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/vfox-moonbit-*.zip
+
+      - name: Publish immutable plugin release and movable manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="dist/vfox-moonbit-${version}.zip"
+          checksum="${archive}.sha256"
+          gh release create "$GITHUB_REF_NAME" "$archive" "$checksum" \
+            --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+          if gh release view manifest >/dev/null 2>&1; then
+            gh release upload manifest dist/manifest.json --clobber
+          else
+            gh release create manifest dist/manifest.json \
+              --title "vfox plugin manifest" \
+              --notes "Machine-readable pointer to the current vfox-moonbit plugin release."
+          fi

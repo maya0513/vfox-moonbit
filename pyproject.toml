@@ -1,0 +1,46 @@
+[project]
+name = "vfox-moonbit-maintenance"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+
+[dependency-groups]
+dev = [
+  "coverage[toml]==7.10.7",
+  "pytest==8.4.2",
+  "pytest-cov==7.0.0",
+  "ruff==0.12.12",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+testpaths = ["tests/python"]
+
+[tool.coverage.run]
+branch = true
+source = ["scripts"]
+omit = ["scripts/e2e.py", "tests/*"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "raise AssertionError",
+  "raise NotImplementedError",
+]
+fail_under = 95
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["A", "ANN", "B", "BLE", "C4", "E", "F", "I", "N", "PERF", "PIE", "PL", "PTH", "RUF", "S", "SIM", "UP", "W"]
+ignore = ["PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/update_latest.py" = ["N818"]
+"tests/**" = ["ANN", "PLR2004", "S101", "S603", "S607"]

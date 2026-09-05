@@ -1,0 +1,266 @@
+name: Update MoonBit latest
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: moonbit-latest-updater
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: discover and propose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read # Read the immediately previous run's partial-state artifact.
+      contents: read # Check out main; writes use the constrained GitHub App token.
+      issues: write # Open deduplicated maintenance issues with GITHUB_TOKEN.
+    steps:
+      - name: Check out main
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Python
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.9.1
+          install: true
+          install_args: python
+          cache: true
+
+      - name: Discover a complete upstream release
+        id: discover
+        shell: bash
+        run: |
+          set +e
+          output="$(python scripts/update_latest.py 2>&1)"
+          exit_code=$?
+          set -e
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" > "$RUNNER_TEMP/moonbit-updater-output.txt"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          if grep -Fq "release incomplete; deferred:" <<<"$output"; then
+            echo "incomplete=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "incomplete=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ $exit_code -eq 2 ]]; then
+            echo "manual_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "manual_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore consecutive partial-publish state
+        if: steps.discover.outputs.incomplete == 'true'
+        id: partial
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state_dir="$RUNNER_TEMP/moonbit-partial-state"
+          previous_dir="$RUNNER_TEMP/moonbit-previous-state"
+          mkdir -p "$state_dir" "$previous_dir"
+          first_seen="$(date -u +%s)"
+          previous_run="$(gh run list --workflow update-latest.yml --branch main --limit 10 \
+            --json databaseId,status --jq '[.[] | select(.status == "completed")][0].databaseId // empty')"
+          if [[ -n "$previous_run" ]] && gh run download "$previous_run" \
+            --name moonbit-partial-state --dir "$previous_dir" 2>/dev/null; then
+            if [[ -f "$previous_dir/first-seen-epoch" ]]; then
+              first_seen="$(<"$previous_dir/first-seen-epoch")"
+            fi
+          fi
+          printf '%s\n' "$first_seen" > "$state_dir/first-seen-epoch"
+          now="$(date -u +%s)"
+          if (( now - first_seen >= 86400 )); then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Persist partial-publish state
+        if: steps.discover.outputs.incomplete == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: moonbit-partial-state
+          path: ${{ runner.temp }}/moonbit-partial-state/first-seen-epoch
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Report publication stalled for 24 hours
+        if: steps.partial.outputs.stale == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[automation] MoonBit release publication stalled"
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [[ -z "$existing" ]]; then
+            gh issue create --title "$title" --body \
+              "All supported MoonBit artifacts have not formed one coherent release for at least 24 hours. Review the updater run and upstream CDN rollout."
+          fi
+
+      - name: Report upstream change requiring review
+        if: steps.discover.outputs.manual_review == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="[automation] MoonBit updater requires manual review"
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [[ -z "$existing" ]]; then
+            gh issue create --title "$title" --body \
+              "The updater detected installer, recipe, version-schema, or major-version drift. Inspect this workflow run before changing any pinned recipe input."
+          fi
+
+      - name: Fail on updater error
+        if: steps.discover.outputs.exit_code != '0' && steps.discover.outputs.manual_review != 'true'
+        shell: bash
+        run: exit 1
+
+      - name: Enforce bot diff allowlist
+        id: diff
+        if: steps.discover.outputs.exit_code == '0' && steps.discover.outputs.incomplete != 'true'
+        shell: bash
+        run: |
+          mapfile -t changed < <({
+            git diff --name-only --diff-filter=ACMRTUXBD
+            git ls-files --others --exclude-standard
+          } | sort -u)
+          for path in "${changed[@]}"; do
+            if [[ "$path" != releases/*.json ]]; then
+              echo "Updater changed forbidden path: $path" >&2
+              exit 1
+            fi
+            if git diff --diff-filter=D --name-only -- "$path" | grep -q .; then
+              echo "Updater deleted release metadata: $path" >&2
+              exit 1
+            fi
+          done
+          if (( ${#changed[@]} > 0 )); then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create repository-scoped GitHub App token
+        if: steps.discover.outputs.manual_review == 'true' || steps.diff.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ secrets.MOONBIT_UPDATER_APP_ID }}
+          private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: vfox-moonbit
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create or update the manual-review pull request
+        if: steps.discover.outputs.manual_review == 'true'
+        shell: bash
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          branch="automation/moonbit-manual-review"
+          remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config user.name "moonbit-updater[bot]"
+          git config user.email "moonbit-updater[bot]@users.noreply.github.com"
+          if git fetch "$remote" "refs/heads/$branch:refs/remotes/updater/manual-review"; then
+            git switch -C "$branch" refs/remotes/updater/manual-review
+          else
+            git switch -C "$branch"
+          fi
+          mkdir -p upstream
+          {
+            printf '# MoonBit updater manual review\n\n'
+            printf 'Automated promotion stopped because an upstream contract changed. '
+            printf 'A maintainer must review the installer, recipe, layout, or version gate.\n\n'
+            printf 'Latest discovery run: <%s/%s/actions/runs/%s>\n\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf '```text\n'
+            sed 's/```/` ` `/g' "$RUNNER_TEMP/moonbit-updater-output.txt"
+            printf '\n```\n'
+          } > upstream/MANUAL_REVIEW.md
+          git add upstream/MANUAL_REVIEW.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: record MoonBit upstream drift"
+            git push "$remote" "HEAD:refs/heads/$branch"
+          fi
+          number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore: review MoonBit upstream drift" \
+              --body "Automation stopped safely. Review upstream/MANUAL_REVIEW.md, update the pinned recipe and tests as needed, and merge only after CODEOWNERS approval and full CI. This PR is never auto-merged."
+          fi
+
+      - name: Create or update the single updater pull request
+        if: steps.diff.outputs.changed == 'true'
+        shell: bash
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          branch="automation/moonbit-latest"
+          version="$(python -c 'import json; print(json.load(open("releases/latest.json", encoding="utf-8"))["version"])')"
+          remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config user.name "moonbit-updater[bot]"
+          git config user.email "moonbit-updater[bot]@users.noreply.github.com"
+          remote_tip=""
+          if git fetch "$remote" "refs/heads/$branch:refs/remotes/updater/latest"; then
+            remote_tip="$(git rev-parse refs/remotes/updater/latest)"
+          fi
+          git switch -C "$branch"
+          git add releases
+          git commit -m "chore: update MoonBit latest to $version"
+          if [[ -n "$remote_tip" ]]; then
+            git push "$remote" "HEAD:refs/heads/$branch" \
+              --force-with-lease="refs/heads/$branch:$remote_tip"
+          else
+            git push "$remote" "HEAD:refs/heads/$branch" \
+              --force-with-lease="refs/heads/$branch:"
+          fi
+          number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore: update MoonBit latest to $version" \
+              --body "Automated promotion after all official artifacts, checksums, archive safety checks, and core/toolchain versions agreed. Changes are restricted to releases/**."
+            number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')"
+          else
+            gh pr edit "$number" --title "chore: update MoonBit latest to $version"
+          fi
+          gh pr merge "$number" --auto --squash
+
+  report-consecutive-failure:
+    name: report three consecutive failures
+    if: failure()
+    needs: update
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read # Inspect the conclusions of the two preceding updater runs.
+      issues: write # Open one issue when the third consecutive run fails.
+    steps:
+      - name: Create one issue after the third consecutive failed run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t conclusions < <(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow update-latest.yml --branch main --limit 10 \
+            --json conclusion,status --jq '[.[] | select(.status == "completed")][0:2] | .[].conclusion')
+          if [[ ${#conclusions[@]} -eq 2 && "${conclusions[0]}" == failure && "${conclusions[1]}" == failure ]]; then
+            title="[automation] MoonBit latest updater failing"
+            existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+              --search "$title in:title" --json number --jq '.[0].number // empty')"
+            if [[ -z "$existing" ]]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body \
+                "The MoonBit latest updater has failed three consecutive times. Inspect the latest workflow runs; main has not been modified by the failed update."
+            fi
+          fi

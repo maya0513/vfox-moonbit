@@ -1,0 +1,16 @@
+describe("plugin metadata", function()
+    it("declares stable public identity and runtime requirements", function()
+        _G.PLUGIN = nil
+        assert(loadfile("metadata.lua"))()
+        assert.equals("moonbit", PLUGIN.name)
+        assert.equals("0.1.0", PLUGIN.version)
+        assert.equals("https://github.com/maya0513/vfox-moonbit", PLUGIN.homepage)
+        assert.equals("Apache-2.0", PLUGIN.license)
+        assert.equals("0.4.0", PLUGIN.minRuntimeVersion)
+        assert.same({ "git" }, PLUGIN.depends)
+        assert.same({ { bin = "git" } }, PLUGIN.systemDependencies)
+        assert.equals(0, #PLUGIN.legacyFilenames)
+        assert.is_true(#PLUGIN.notes >= 2)
+        _G.PLUGIN = nil
+    end)
+end)

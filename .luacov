@@ -1,0 +1,13 @@
+return {
+    statsfile = "luacov.stats.out",
+    reportfile = "luacov.report.out",
+    include = {
+        "^hooks/",
+        "^lib/moonbit_",
+        "^metadata%.lua$",
+    },
+    exclude = {
+        "^lib/sha2%.lua$",
+        "^tests/",
+    },
+}

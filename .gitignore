@@ -1,0 +1,63 @@
+# Local credentials and environment overrides
+/.env
+/.env.*
+!/.env.example
+/.envrc
+/secrets/
+/.secrets/
+/.git-credentials
+/.netrc
+/.npmrc
+/.pypirc
+/*.key
+/*.pem
+/*.p12
+/*.pfx
+/mise.local.toml
+/.mise.local.toml
+/.mise.toml
+
+# Tool-manager and agent-local state
+/.mise/
+/.version-fox/
+/.vfox/
+/.direnv/
+/.codex/
+/.agents/
+
+# Python, Lua, and test state
+/.coverage
+/.coverage.*
+/.lua/
+/.luacov/
+/.pytest_cache/
+/.ruff_cache/
+/.venv/
+/.rocks/
+/htmlcov/
+/coverage.xml
+/coverage.json
+/luacov.report.out
+/luacov.stats.out
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Generated packages and build output
+/dist/
+/build/
+/target/
+/result
+/result-*
+*.part
+
+# Editors and operating systems
+/.idea/
+/.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

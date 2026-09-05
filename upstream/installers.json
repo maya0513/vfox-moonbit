@@ -1,0 +1,14 @@
+{
+  "files": {
+    "powershell": {
+      "sha256": "a5101e91ffa9905fb25cd009b9a4aa942971a294bd055c89836e3af89b710c64",
+      "url": "https://cli.moonbitlang.com/install/powershell.ps1"
+    },
+    "unix": {
+      "sha256": "46495f8cdc0050f79b6cb195d66478d101cb3601d68506568fbe377fcdf2a9fe",
+      "url": "https://cli.moonbitlang.com/install/unix.sh"
+    }
+  },
+  "recipe": 1,
+  "schema": 1
+}

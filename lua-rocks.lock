@@ -1,0 +1,15 @@
+# Install order is significant. Every direct and transitive test rock is pinned.
+lua_cliargs 3.0-2
+luasystem 0.7.1-1
+dkjson 2.11-1
+say 1.4.1-3
+luassert 1.9.0-1
+lua-term 0.8-1
+luafilesystem 1.9.0-1
+penlight 1.15.0-1
+mediator_lua 1.1.2-0
+datafile 0.11-1
+busted 2.2.0-1
+luacov 0.16.0-1
+argparse 0.7.1-1
+luacheck 1.2.0-1

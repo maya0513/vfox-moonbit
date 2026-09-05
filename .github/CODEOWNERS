@@ -1,0 +1,14 @@
+/metadata.lua @maya0513
+/.github/CODEOWNERS @maya0513
+/hooks/ @maya0513
+/lib/ @maya0513
+/scripts/ @maya0513
+/tests/ @maya0513
+/.github/workflows/ @maya0513
+/upstream/ @maya0513
+/vendor-lock.json @maya0513
+/mise.toml @maya0513
+/mise.lock @maya0513
+/lua-rocks.lock @maya0513
+/pyproject.toml @maya0513
+/uv.lock @maya0513
