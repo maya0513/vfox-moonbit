@@ -29,21 +29,31 @@ Either change requires a plugin code review.
    exact record and host, then returns the official toolchain URL and SHA-256.
 3. vfox/mise downloads, verifies, and extracts the toolchain.
 4. `PostInstall` checks Git and the toolchain layout, refetches only the exact
-   manifest, downloads core into `.part`, hashes it through vendored pure Lua,
-   and extracts it into a staging directory.
+   manifest, downloads core into `.part`, hashes it through pure Lua, and
+   extracts it into a staging directory. The pinned upstream implementation is
+   used on standard Lua; a small derived MIT implementation covers GopherLua's
+   non-standard assignment semantics.
 5. The core `moon.mod` version must exactly match the toolchain. The staged core
-   is moved into place, `moonx` is constructed, permissions are repaired on
-   Unix, and both official core bundle commands run with the versioned
-   `MOON_HOME`.
-6. `EnvKeys` returns only `PATH` and `MOON_HOME`.
+   is moved into place, permissions are repaired on Unix, and both official
+   core bundle commands run with `MOON_TOOLCHAIN_ROOT` plus an ephemeral
+   `MOON_HOME`. A failure restores the previous core.
+6. `moonx` and the `moon-lsp`/`moon-ide` compatibility shims are constructed.
+7. `EnvKeys` prepends the shim and binary directories, exports
+   `MOON_TOOLCHAIN_ROOT`, and deliberately leaves the caller's mutable
+   `MOON_HOME` unchanged.
 
 Git is declared both as a mise-managed hook dependency (`depends`) and as a
 host executable prerequisite (`systemDependencies`). Runtimes predating the
 system-dependency preflight still receive the same actionable hard failure from
 `PostInstall`.
 
+The minimum standalone runtime is vfox 0.5.0. Versions 0.4.0 through 0.4.2
+contain the archiver implementation but do not preload it into plugin Lua
+states, so secure in-process core extraction is unavailable. The plugin does
+not fall back to an unverified external archive command.
+
 The runtime adapter also normalizes the two real vfox extraction/context
-shapes: standalone vfox 0.4 identifies the main SDK root through
+shapes: standalone vfox 0.x identifies the main SDK root through
 `ctx.sdkInfo.moonbit.path` and may strip a single archive root, while mise
 provides the install root directly and preserves `core/`. Only the verified
 `stage/core/moon.mod` and `stage/moon.mod` layouts are accepted.
@@ -51,6 +61,13 @@ provides the install root directly and preserves `core/`. Only the verified
 The additional-file hook is not used because mise and standalone vfox have had
 different handling semantics for additional archives. Core installation is a
 single explicit transaction under `PostInstall` instead.
+
+This environment split follows Moon's package-manager layout and the approach
+used by `moonbit-community/moonbit-overlay`: normal `moon` commands receive the
+immutable root through `MOON_TOOLCHAIN_ROOT`, while current native helpers are
+given both variables in a process-local shim. The overlay's Nix-specific
+patchelf, tinycc replacement, artifact mirror, historical/nightly channels,
+combined version identifier, and LLVM bundle are intentionally not adopted.
 
 ## Automated promotion
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,24 +24,79 @@ def test_exact_version_and_exec_version_detection(tmp_path):
         e2e.exact_version(tmp_path)
 
 
+def test_remove_legacy_vfox_artifacts_is_exactly_scoped(tmp_path):
+    vfox_home = tmp_path / "configured"
+    user_home = tmp_path / "home"
+    alias = "moonbit-e2e-123"
+    keep = user_home / ".version-fox" / "plugin" / "moonbit-user-plugin"
+    keep.mkdir(parents=True)
+    (keep / "metadata.lua").write_text("keep", encoding="utf-8")
+
+    for base in (vfox_home, user_home / ".version-fox", user_home / ".vfox"):
+        for category in ("plugin", "plugins", "cache"):
+            generated = base / category / alias
+            generated.mkdir(parents=True)
+            (generated / "generated").write_text("test", encoding="utf-8")
+
+    e2e.remove_legacy_vfox_artifacts(alias, env={"VFOX_HOME": str(vfox_home)}, user_home=user_home)
+    assert (keep / "metadata.lua").read_text(encoding="utf-8") == "keep"
+    assert not any(path.name == alias for path in tmp_path.rglob(alias))
+
+    with pytest.raises(e2e.E2EError, match="unexpected vfox alias"):
+        e2e.remove_legacy_vfox_artifacts("moonbit", env={"VFOX_HOME": str(vfox_home)}, user_home=user_home)
+
+
 def test_parse_vfox_environment(tmp_path):
     root = tmp_path / "install root"
     (root / "bin").mkdir(parents=True)
+    (root / "shims").mkdir()
     output = "notice\n" + json.dumps(
         {
             "is_hook_env": False,
-            "paths": [str(root / "bin")],
-            "sdks": {"moonbit": {"MOON_HOME": str(root)}},
+            "paths": [str(root / "shims"), str(root / "bin")],
+            "sdks": {"moonbit": {"MOON_TOOLCHAIN_ROOT": str(root)}},
         }
     )
-    assert e2e.parse_vfox_environment(output, root) == (str(root / "bin"), str(root))
+    assert e2e.parse_vfox_environment(output, root) == ([str(root / "shims"), str(root / "bin")], str(root))
 
     with pytest.raises(e2e.E2EError, match="JSON object"):
         e2e.parse_vfox_environment("not json", root)
     with pytest.raises(e2e.E2EError, match="unexpected schema"):
         e2e.parse_vfox_environment("{}", root)
-    with pytest.raises(e2e.E2EError, match="exact PATH"):
+    with pytest.raises(e2e.E2EError, match="expected shim/bin PATH"):
         e2e.parse_vfox_environment(json.dumps({"paths": [], "sdks": {}}), root)
+    with pytest.raises(e2e.E2EError, match="must not override"):
+        e2e.parse_vfox_environment(
+            json.dumps(
+                {
+                    "paths": [str(root / "shims"), str(root / "bin")],
+                    "sdks": {"moonbit": {"MOON_TOOLCHAIN_ROOT": str(root), "MOON_HOME": str(root)}},
+                }
+            ),
+            root,
+        )
+
+
+def test_find_vfox_root_normalizes_the_version_container(tmp_path, monkeypatch):
+    version = "0.1.2+abc"
+    container = tmp_path / "vfox" / "cache" / "moonbit-e2e-123" / f"v-{version}"
+    root = container / f"moonbit-{version}"
+    (root / "bin").mkdir(parents=True)
+    executable = "moon.exe" if os.name == "nt" else "moon"
+    (root / "bin" / executable).write_bytes(b"moon")
+
+    monkeypatch.setattr(
+        e2e,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, stdout=str(container) + "\n", stderr=""),
+    )
+    found = e2e.find_vfox_root(
+        "moonbit-e2e-123",
+        version,
+        cwd=tmp_path,
+        env={"VFOX_HOME": str(tmp_path / "vfox")},
+    )
+    assert found == root.resolve()
 
 
 def test_manifest_server_and_prepare_plugin(tmp_path, monkeypatch):
@@ -110,6 +166,9 @@ def test_validate_install_checks_toolchain_core_and_containment(tmp_path):
     (root / "bin" / "internal").mkdir(parents=True)
     for name in e2e.REQUIRED_EXECUTABLES:
         (root / "bin" / name).write_bytes(name.encode())
+    (root / "shims").mkdir()
+    for name in e2e.HELPER_EXECUTABLES:
+        (root / "shims" / name).write_bytes(name.encode())
     (root / "bin" / "internal" / "tcc").write_bytes(b"tcc")
     (root / "bin" / "moonx").symlink_to("moon")
     (root / "lib" / "core" / "builtin").mkdir(parents=True)
@@ -130,7 +189,12 @@ def test_validate_install_checks_toolchain_core_and_containment(tmp_path):
 
 def test_run_reports_success_and_failure(tmp_path):
     env = os.environ.copy()
-    success = e2e.run([os.fspath(Path(os.sys.executable)), "-c", "print('ok')"], cwd=tmp_path, env=env)
+    success = e2e.run(
+        [os.fspath(Path(os.sys.executable)), "-c", "print(input())"],
+        cwd=tmp_path,
+        env=env,
+        input_text="ok\n",
+    )
     assert success.stdout == "ok\n"
     with pytest.raises(e2e.E2EError, match="exited 3"):
         e2e.run([os.fspath(Path(os.sys.executable)), "-c", "raise SystemExit(3)"], cwd=tmp_path, env=env)

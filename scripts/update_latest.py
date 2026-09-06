@@ -65,6 +65,7 @@ UNIX_REQUIRED: Final = (
     "bin/mooninfo",
     "bin/moonrun",
     "bin/moon-lsp",
+    "bin/moon-ide",
     "bin/internal/tcc",
 )
 WINDOWS_REQUIRED: Final = tuple(f"{item}.exe" for item in UNIX_REQUIRED if item != "bin/internal/tcc")

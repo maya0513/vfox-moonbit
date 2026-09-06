@@ -9,10 +9,14 @@ function PLUGIN:EnvKeys(ctx)
     return {
         {
             key = "PATH",
+            value = Runtime.join(os_name, root, "shims"),
+        },
+        {
+            key = "PATH",
             value = Runtime.join(os_name, root, "bin"),
         },
         {
-            key = "MOON_HOME",
+            key = "MOON_TOOLCHAIN_ROOT",
             value = root,
         },
     }

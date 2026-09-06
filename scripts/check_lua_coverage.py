@@ -20,6 +20,8 @@ EXPECTED = {
     "lib/moonbit_manifest.lua",
     "lib/moonbit_runtime.lua",
     "lib/moonbit_sha256.lua",
+    "lib/moonbit_sha256_portable.lua",
+    "lib/moonbit_toolchain.lua",
 }
 
 

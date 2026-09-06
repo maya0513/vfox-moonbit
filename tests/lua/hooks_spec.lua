@@ -61,7 +61,7 @@ describe("vfox hooks", function()
         assert.is_nil(result.addition)
     end)
 
-    it("exports only PATH and MOON_HOME", function()
+    it("exports helper shims, binaries, and the immutable toolchain root", function()
         package.loaded.moonbit_runtime = {
             get = function(ctx, name)
                 return ctx[name]
@@ -76,9 +76,14 @@ describe("vfox hooks", function()
         _G.RUNTIME = { osType = "Linux" }
         local plugin = load_hook("hooks/env_keys.lua")
         local direct = plugin:EnvKeys({ path = "/root" })
-        assert.same({ { key = "PATH", value = "/root/bin" }, { key = "MOON_HOME", value = "/root" } }, direct)
+        assert.same({
+            { key = "PATH", value = "/root/shims" },
+            { key = "PATH", value = "/root/bin" },
+            { key = "MOON_TOOLCHAIN_ROOT", value = "/root" },
+        }, direct)
+        assert.is_nil(direct.MOON_HOME)
         local fallback = plugin:EnvKeys({})
-        assert.equals("/fallback", fallback[2].value)
+        assert.equals("/fallback", fallback[3].value)
     end)
 
     it("delegates PostInstall to the installer", function()

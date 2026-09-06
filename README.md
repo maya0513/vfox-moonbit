@@ -41,8 +41,9 @@ vfox install --yes moonbit@latest
 vfox exec moonbit@latest -- moon version --all --json --no-path
 ```
 
-`vfox exec` requires vfox 1.0 or newer. With the compatibility-floor vfox
-0.4.0, activate a vfox-enabled shell and use `vfox use moonbit@latest` instead.
+The `--yes` flag and `vfox exec` require vfox 1.0 or newer. With the
+compatibility-floor vfox 0.5.0, run `vfox install moonbit@latest`, confirm the
+prompt, then activate a vfox-enabled shell and use `vfox use moonbit@latest`.
 
 ## What is installed
 
@@ -56,8 +57,11 @@ archive for each stable build. The plugin treats them as one release:
 - installation refetches that exact manifest, streams core to a `.part` file,
   verifies it before extraction, checks `core/moon.mod`, and runs the two bundle
   commands used by MoonBit's official installers;
-- `PATH` points to `<install-root>/bin` and `MOON_HOME` points to the exact
-  install root.
+- `PATH` selects `<install-root>/shims` and `<install-root>/bin`, while
+  `MOON_TOOLCHAIN_ROOT` identifies the immutable toolchain and matching core;
+- `MOON_HOME` remains the caller's mutable user-state directory. Compatibility
+  shims set it to the toolchain root only for `moon-lsp` and `moon-ide`, whose
+  current binaries still use it to locate core.
 
 The plugin never mirrors or redistributes MoonBit binaries. A historical exact
 manifest remains in this repository, but reinstalling it is not guaranteed if
@@ -88,13 +92,14 @@ plugin's scope.
 
 ## State, login, and editors
 
-The plugin does not write `~/.moon`, shell startup files, or credentials.
-MoonBit's authentication, package index, and caches live under the versioned
-`MOON_HOME`, so after an upgrade you may need to run `moon login` again. This
-is deliberate isolation: credentials are not copied between toolchain roots.
+The plugin installer does not write `~/.moon`, shell startup files, or
+credentials. MoonBit's authentication, package index, and caches use the normal
+mutable `MOON_HOME` (defaulting to `~/.moon`) and are therefore retained when
+mise/vfox selects a newer toolchain. An existing custom `MOON_HOME` is
+preserved.
 
-Start an editor from the managed environment so its LSP resolves the same
-toolchain and core:
+Start an editor from the managed environment so `MOON_TOOLCHAIN_ROOT` and the
+helper shims make its LSP/IDE resolve the same toolchain and core:
 
 ```shell
 mise exec -- code .

@@ -141,7 +141,7 @@ function M.context(ctx)
     ctx = ctx or {}
     local sdk_info = M.get(ctx, "sdkInfo") or {}
     local sdk = M.get(sdk_info, "moonbit") or M.get(ctx, "main") or {}
-    -- standalone vfox 0.4 passes rootPath as the version container and the
+    -- standalone vfox 0.x passes rootPath as the version container and the
     -- actual main SDK root as sdkInfo.moonbit.path. mise currently uses the
     -- same path for both, so the more precise SDK path is safe to prefer.
     local root = M.get(sdk, "path") or M.get(ctx, "rootPath", "path", "install_path")

@@ -19,7 +19,8 @@ run by GitHub-hosted ephemeral workers. To opt in locally, run:
 python scripts/e2e.py --backend vfox --allow-vfox-user-state
 ```
 
-The test asserts that `~/.moon` is unchanged.
+The tests set an isolated mutable `MOON_HOME` and assert that the real
+`~/.moon` is unchanged.
 
 ## Release manifests
 

@@ -30,7 +30,7 @@ local function make_toolchain(root, suffix)
     suffix = suffix or ""
     assert(Runtime.execute_succeeded(os.execute("mkdir -p -- " .. Runtime.quote_unix(root .. "/bin/internal"))))
     assert(Runtime.execute_succeeded(os.execute("mkdir -p -- " .. Runtime.quote_unix(root .. "/lib"))))
-    for _, executable in ipairs({ "moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp" }) do
+    for _, executable in ipairs({ "moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp", "moon-ide" }) do
         write(root .. "/bin/" .. executable .. suffix, executable)
     end
     write(root .. "/bin/internal/tcc", "tcc")
@@ -116,8 +116,13 @@ describe("MoonBit post-install", function()
         assert.matches("ln %-sfn moon", joined)
         assert.matches("bundle.-%-%-all", joined)
         assert.matches("%-%-target.-wasm%-gc.-%-%-quiet", joined)
-        assert.matches("MOON_HOME=", joined)
+        assert.matches("MOON_TOOLCHAIN_ROOT=", joined)
+        assert.matches("MOON_HOME=.*%.vfox%-moonbit%-bundle%-home", joined)
         assert.matches("PATH=", joined)
+        assert.is_truthy(read(root .. "/shims/moon-lsp"):find("MOON_HOME=", 1, true))
+        assert.is_truthy(read(root .. "/shims/moon-ide"):find("MOON_TOOLCHAIN_ROOT=", 1, true))
+        assert.is_nil(io.open(root .. "/.vfox-moonbit-bundle-home", "rb"))
+        assert.is_nil(joined:match("chmod [^\n]* %-%- "))
     end)
 
     it("is idempotent when the same core already exists", function()
@@ -165,7 +170,7 @@ describe("MoonBit post-install", function()
         assert.equals("dead", coroutine.status(thread))
     end)
 
-    it("normalizes the root-stripping archiver used by standalone vfox 0.4", function()
+    it("normalizes the root-stripping archiver used by standalone vfox 0.x", function()
         local root = temp_root()
         make_toolchain(root)
         local deps = dependencies(root, {
@@ -210,6 +215,14 @@ describe("MoonBit post-install", function()
         end)
 
         write(root .. "/bin/moonc", "moonc")
+        os.remove(root .. "/bin/moon-ide")
+        deps = dependencies(root)
+        assert.has_error(function()
+            Installer.new(deps)
+                :install({ rootPath = root, version = VERSION }, { osType = "Linux", archType = "amd64" })
+        end)
+
+        write(root .. "/bin/moon-ide", "moon-ide")
         os.remove(root .. "/bin/internal/tcc")
         deps = dependencies(root)
         assert.has_error(function()
@@ -335,7 +348,8 @@ describe("MoonBit post-install", function()
         installer:_bundle(root, "windows")
         local joined = table.concat(commands, "\n")
         assert.matches("mklink /H", joined)
-        assert.matches('set "MOON_HOME=', joined)
+        assert.matches('set "MOON_TOOLCHAIN_ROOT=', joined)
+        assert.matches('set "MOON_HOME=.*%.vfox%-moonbit%-bundle%-home', joined)
         assert.matches("wasm%-gc", joined)
     end)
 
@@ -466,6 +480,28 @@ describe("MoonBit post-install", function()
             installer:_install_core("/stage", "/dest", "/backup", VERSION, "linux")
         end)
         assert.equals(3, #rename_calls)
+    end)
+
+    it("uses an injected toolchain and commits a successful promotion", function()
+        local transaction = { id = "transaction" }
+        local promoted = {}
+        local committed
+        local installer = Installer.new({
+            manifest = {},
+            http = {},
+            toolchain = {
+                promote_core = function(_, ...)
+                    promoted = { ... }
+                    return transaction
+                end,
+                commit_core = function(_, value)
+                    committed = value
+                end,
+            },
+        })
+        installer:_install_core("stage", "destination", "backup", VERSION, "linux")
+        assert.same({ "stage", "destination", "backup", "linux" }, promoted)
+        assert.equals(transaction, committed)
     end)
 
     it("refuses to overwrite an existing core that cannot be staged", function()

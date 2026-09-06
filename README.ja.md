@@ -37,8 +37,9 @@ vfox install --yes moonbit@latest
 vfox exec moonbit@latest -- moon version --all --json --no-path
 ```
 
-`vfox exec` は vfox 1.0 以降の機能です。互換性 floor の vfox 0.4.0 では、
-vfox を activate 済みの shell で `vfox use moonbit@latest` を使ってください。
+`--yes` と `vfox exec` は vfox 1.0 以降の機能です。互換性 floor の vfox
+0.5.0 では `vfox install moonbit@latest` を実行して確認に応答した後、vfox を
+activate 済みの shell で `vfox use moonbit@latest` を使ってください。
 
 ## インストールの仕組み
 
@@ -51,7 +52,11 @@ MoonBit の toolchain 本体と同時リリースされる `core` 標準ライ�
 - インストール時は exact manifest を再取得し、core を `.part` に保存して hash を
   検証してから展開します。`core/moon.mod` の版も完全一致させ、公式 installer と
   同じ二つの bundle コマンドを実行します。
-- 環境変数は `PATH=<install-root>/bin` と `MOON_HOME=<install-root>` だけです。
+- `PATH` は `<install-root>/shims`、`<install-root>/bin` の順に設定し、不変な
+  toolchain と core は `MOON_TOOLCHAIN_ROOT=<install-root>` で選択します。
+- 可変なユーザー状態の `MOON_HOME` は上書きしません。現行バイナリがcore探索に
+  まだ必要とするため、`moon-lsp` と `moon-ide` の互換shim内だけでinstall rootを
+  `MOON_HOME` に設定します。
 
 MoonBit のバイナリはこのリポジトリで再配布・ミラーしません。過去の exact manifest
 は残しますが、公式 CDN から削除された版の再インストールまでは保証できません。
@@ -77,11 +82,13 @@ tool や library はこのプラグインの管理対象外です。
 
 ## 認証、状態、IDE
 
-プラグインは `~/.moon`、shell 設定、認証情報に触れません。認証、package index、
-cache は版ごとの `MOON_HOME` に分離されるので、更新後に `moon login` が再度必要に
-なる場合があります。別 toolchain へ認証情報を自動コピーしないための仕様です。
+プラグインのインストーラーは `~/.moon`、shell 設定、認証情報に触れません。認証、
+package index、cache は通常の可変な `MOON_HOME`（未指定時は `~/.moon`）を使うため、
+mise/vfox でtoolchainを更新しても保持されます。利用者が設定済みの `MOON_HOME` も
+上書きしません。
 
-LSP と CLI が同じ toolchain/core を参照するよう、IDE も管理環境から起動します。
+`MOON_TOOLCHAIN_ROOT` とhelper shimによりLSPとCLIが同じtoolchain/coreを参照するよう、
+IDEも管理環境から起動します。
 
 ```shell
 mise exec -- code .
