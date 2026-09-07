@@ -78,7 +78,8 @@ macOS Intel、Windows ARM64 emulation、32-bit、musl/Alpine、その他 OS は�
 best-effort で、正式なテスト対象ではありません。
 
 MoonBit が利用する Git は必須です。native target で必要になる platform 固有の
-tool や library はこのプラグインの管理対象外です。
+tool や library はこのプラグインの管理対象外です。Windows のインストール処理は、
+path を安全に扱うため OS 標準の Windows PowerShell（`powershell.exe`）を使います。
 
 ## 認証、状態、IDE
 

@@ -56,6 +56,7 @@ describe("MoonBit runtime adapter", function()
         assert.equals("'hello world'", Runtime.quote_unix("hello world"))
         assert.equals("'a'\\''b'", Runtime.quote_unix("a'b"))
         assert.equals('"a ""quote"""', Runtime.quote_windows('a "quote"'))
+        assert.equals("'a''b'", Runtime.quote_powershell("a'b"))
         assert.has_error(function()
             Runtime.quote_windows("bad\nargument")
         end)
@@ -68,6 +69,39 @@ describe("MoonBit runtime adapter", function()
         assert.has_error(function()
             Runtime.quote_unix("bad\0argument")
         end)
+        assert.has_error(function()
+            Runtime.quote_powershell("bad\nargument")
+        end)
+    end)
+
+    it("builds quote-free PowerShell encoded commands for Windows", function()
+        assert.equals("", Runtime.base64_encode(""))
+        assert.equals("Zg==", Runtime.base64_encode("f"))
+        assert.equals("Zm8=", Runtime.base64_encode("fo"))
+        assert.equals("Zm9v", Runtime.base64_encode("foo"))
+        assert.equals(
+            string.char(0x41, 0, 0xe9, 0, 0x08, 0x67, 0x3d, 0xd8, 0, 0xde),
+            Runtime.utf8_to_utf16le("Aé月😀")
+        )
+        assert.equals(
+            "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand QQA=",
+            Runtime.powershell_command("A")
+        )
+        assert.equals(
+            Runtime.powershell_command("$ErrorActionPreference = 'Stop'; A"),
+            Runtime.checked_powershell_command("A")
+        )
+        for _, invalid in ipairs({
+            string.char(0xc0, 0x80),
+            string.char(0xe2, 0x82),
+            string.char(0xe0, 0x80, 0x80),
+            string.char(0xed, 0xa0, 0x80),
+            string.char(0xf4, 0x90, 0x80, 0x80),
+        }) do
+            assert.has_error(function()
+                Runtime.utf8_to_utf16le(invalid)
+            end)
+        end
     end)
 
     it("joins paths with the host separator", function()
@@ -163,9 +197,11 @@ describe("MoonBit runtime adapter", function()
         Runtime.make_dir("C:\\a b", "Windows", execute)
         assert.equals(4, #commands)
         assert.matches("rm %-rf", commands[1])
-        assert.matches("rmdir /S /Q", commands[2])
+        assert.matches("powershell%.exe", commands[2])
         assert.matches("mkdir %-p", commands[3])
-        assert.matches("if not exist", commands[4])
+        assert.matches("powershell%.exe", commands[4])
+        assert.is_nil(commands[2]:find('"', 1, true))
+        assert.is_nil(commands[4]:find('"', 1, true))
         for _, unsafe in ipairs({ "", "/", "/tmp/core", ".vfox-moonbit-stage" }) do
             assert.has_error(function()
                 Runtime.remove_tree(unsafe, "Linux", execute)

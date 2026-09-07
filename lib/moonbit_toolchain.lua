@@ -227,12 +227,10 @@ function M:make_moonx(root, os_name)
     self.remove(moonx)
 
     if os_name == "windows" then
-        local command = table.concat({
-            "mklink /H",
-            self.runtime.quote_windows(moonx),
-            self.runtime.quote_windows(moon),
-            ">NUL",
-        }, " ")
+        local script = "New-Item -ItemType HardLink -Path " .. self.runtime.quote_powershell(moonx)
+        script = script .. " -Target " .. self.runtime.quote_powershell(moon)
+        script = script .. " | Out-Null"
+        local command = self.runtime.checked_powershell_command(script)
         local first, second, third = self.executor(command)
         if not self.runtime.execute_succeeded(first, second, third) then
             local copied, copy_error = copy_file(moon, moonx, self.opener)
@@ -262,13 +260,12 @@ function M:_unix_helper(root, helper, os_name)
     }, "\n")
 end
 
-function M:_windows_helper(root, helper, os_name)
-    local target = self.runtime.join(os_name, root, "bin", helper .. ".exe")
+function M:_windows_helper(helper)
     return table.concat({
         "@echo off",
-        "set " .. self.runtime.quote_windows("MOON_TOOLCHAIN_ROOT=" .. root),
-        "set " .. self.runtime.quote_windows("MOON_HOME=" .. root),
-        self.runtime.quote_windows(target) .. " %*",
+        'for %%I in ("%~dp0..") do set "MOON_TOOLCHAIN_ROOT=%%~fI"',
+        'set "MOON_HOME=%MOON_TOOLCHAIN_ROOT%"',
+        '"%MOON_TOOLCHAIN_ROOT%\\bin\\' .. helper .. '.exe" %*',
         "",
     }, "\r\n")
 end
@@ -281,7 +278,7 @@ function M:make_helper_shims(root, os_name)
         local shim = self.runtime.join(os_name, shims, helper .. extension)
         local temporary = shim .. ".part"
         self.remove(temporary)
-        local content = os_name == "windows" and self:_windows_helper(root, helper, os_name)
+        local content = os_name == "windows" and self:_windows_helper(helper)
             or self:_unix_helper(root, helper, os_name)
         local written, write_error = write_all(temporary, content, self.opener)
         if not written then
@@ -317,16 +314,23 @@ function M:bundle(root, os_name)
             local command
             if os_name == "windows" then
                 local path = bin .. ";" .. (self.getenv("PATH") or "")
-                local command_parts = { self.runtime.quote_windows(moon), "-C", self.runtime.quote_windows(core) }
+                local command_parts = {
+                    "&",
+                    self.runtime.quote_powershell(moon),
+                    "-C",
+                    self.runtime.quote_powershell(core),
+                }
                 for _, argument in ipairs(arguments) do
-                    command_parts[#command_parts + 1] = argument
+                    command_parts[#command_parts + 1] = self.runtime.quote_powershell(argument)
                 end
-                command = table.concat({
-                    "set " .. self.runtime.quote_windows("MOON_TOOLCHAIN_ROOT=" .. root),
-                    "set " .. self.runtime.quote_windows("MOON_HOME=" .. bundle_home),
-                    "set " .. self.runtime.quote_windows("PATH=" .. path),
+                local script = table.concat({
+                    "$env:MOON_TOOLCHAIN_ROOT = " .. self.runtime.quote_powershell(root),
+                    "$env:MOON_HOME = " .. self.runtime.quote_powershell(bundle_home),
+                    "$env:PATH = " .. self.runtime.quote_powershell(path),
                     table.concat(command_parts, " "),
-                }, " && ")
+                    "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+                }, "; ")
+                command = self.runtime.checked_powershell_command(script)
             else
                 local path = bin .. ":" .. (self.getenv("PATH") or "")
                 local pieces = {

@@ -186,7 +186,9 @@ jobs:
             printf 'Latest discovery run: <%s/%s/actions/runs/%s>\n\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf '```text\n'
-            sed 's/```/` ` `/g' "$RUNNER_TEMP/moonbit-updater-output.txt"
+            printf -v fence '\x60\x60\x60'
+            printf -v spaced_fence '\x60 \x60 \x60'
+            sed "s/$fence/$spaced_fence/g" "$RUNNER_TEMP/moonbit-updater-output.txt"
             printf '\n```\n'
           } > upstream/MANUAL_REVIEW.md
           git add upstream/MANUAL_REVIEW.md

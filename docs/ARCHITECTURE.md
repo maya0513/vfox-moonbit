@@ -58,6 +58,13 @@ shapes: standalone vfox 0.x identifies the main SDK root through
 provides the install root directly and preserves `core/`. Only the verified
 `stage/core/moon.mod` and `stage/moon.mod` layouts are accepted.
 
+On Windows, GopherLua launches `os.execute` commands through `cmd.exe`, whose
+second round of parsing breaks command strings containing quoted paths. The
+adapter therefore sends filesystem, hardlink, and bundle operations through
+Windows PowerShell `-EncodedCommand` using UTF-16LE/Base64. Paths never appear
+in the outer command line, including paths with spaces, Unicode, or shell
+metacharacters.
+
 The additional-file hook is not used because mise and standalone vfox have had
 different handling semantics for additional archives. Core installation is a
 single explicit transaction under `PostInstall` instead.

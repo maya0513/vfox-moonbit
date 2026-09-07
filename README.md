@@ -88,7 +88,8 @@ configured `nix-ld`; it is not a supported test target.
 
 Git is required by MoonBit. Native targets may also need the platform tools and
 libraries required by the selected MoonBit backend; those are outside this
-plugin's scope.
+plugin's scope. On Windows, installation uses the in-box Windows PowerShell
+(`powershell.exe`) for path-safe filesystem and bundle operations.
 
 ## State, login, and editors
 

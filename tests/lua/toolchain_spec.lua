@@ -72,9 +72,9 @@ describe("MoonBit toolchain preparation", function()
         assert.equals(0, #commands)
         for _, helper in ipairs(Toolchain.HELPER_EXECUTABLES) do
             local shim = read(root .. "/shims/" .. helper .. ".cmd")
-            assert.is_truthy(shim:find('set "MOON_TOOLCHAIN_ROOT=' .. root .. '"', 1, true))
-            assert.is_truthy(shim:find('set "MOON_HOME=' .. root .. '"', 1, true))
-            assert.is_truthy(shim:find(root .. "/bin/" .. helper .. '.exe" %*', 1, true))
+            assert.is_truthy(shim:find('for %%I in ("%~dp0..")', 1, true))
+            assert.is_truthy(shim:find('set "MOON_HOME=%MOON_TOOLCHAIN_ROOT%"', 1, true))
+            assert.is_truthy(shim:find('"%MOON_TOOLCHAIN_ROOT%\\bin\\' .. helper .. '.exe" %*', 1, true))
             assert.is_nil(io.open(root .. "/shims/" .. helper .. ".cmd.part", "rb"))
         end
     end)

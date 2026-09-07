@@ -331,12 +331,15 @@ describe("MoonBit post-install", function()
         windows_runtime.join = function(_, ...)
             return Runtime.join("Linux", ...)
         end
+        windows_runtime.checked_powershell_command = function(script)
+            return script
+        end
         local deps = dependencies(root, {
             runtime = windows_runtime,
             commands = commands,
             executor = function(command)
                 commands[#commands + 1] = command
-                if command:match("^mklink") then
+                if command:match("^New%-Item") then
                     return false, "exit", 1
                 end
                 return 0
@@ -347,9 +350,9 @@ describe("MoonBit post-install", function()
         assert.equals(read(root .. "/bin/moon.exe"), read(root .. "/bin/moonx.exe"))
         installer:_bundle(root, "windows")
         local joined = table.concat(commands, "\n")
-        assert.matches("mklink /H", joined)
-        assert.matches('set "MOON_TOOLCHAIN_ROOT=', joined)
-        assert.matches('set "MOON_HOME=.*%.vfox%-moonbit%-bundle%-home', joined)
+        assert.matches("New%-Item %-ItemType HardLink", joined)
+        assert.matches("%$env:MOON_TOOLCHAIN_ROOT =", joined)
+        assert.matches("%$env:MOON_HOME =.*%.vfox%-moonbit%-bundle%-home", joined)
         assert.matches("wasm%-gc", joined)
     end)
 
@@ -363,10 +366,13 @@ describe("MoonBit post-install", function()
         windows_runtime.join = function(_, ...)
             return Runtime.join("Linux", ...)
         end
+        windows_runtime.checked_powershell_command = function(script)
+            return script
+        end
         local deps = dependencies(root, {
             runtime = windows_runtime,
             executor = function(command)
-                if command:match("^mklink") then
+                if command:match("^New%-Item") then
                     write(root .. "/bin/moonx.exe", "tampered")
                 end
                 return 0
