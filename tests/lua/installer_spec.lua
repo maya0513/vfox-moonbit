@@ -324,6 +324,7 @@ describe("MoonBit post-install", function()
         local root = temp_root()
         make_toolchain(root, ".exe")
         local commands = {}
+        local powershell_scripts = {}
         local windows_runtime = {}
         for key, value in pairs(Runtime) do
             windows_runtime[key] = value
@@ -332,11 +333,16 @@ describe("MoonBit post-install", function()
             return Runtime.join("Linux", ...)
         end
         windows_runtime.checked_powershell_command = function(script)
+            powershell_scripts[#powershell_scripts + 1] = script
             return script
         end
         local deps = dependencies(root, {
             runtime = windows_runtime,
             commands = commands,
+            getenv = function(name)
+                assert.equals("PATH", name)
+                return string.rep("long-parent-path;", 1000)
+            end,
             executor = function(command)
                 commands[#commands + 1] = command
                 if command:match("^New%-Item") then
@@ -353,6 +359,15 @@ describe("MoonBit post-install", function()
         assert.matches("New%-Item %-ItemType HardLink", joined)
         assert.matches("%$env:MOON_TOOLCHAIN_ROOT =", joined)
         assert.matches("%$env:MOON_HOME =.*%.vfox%-moonbit%-bundle%-home", joined)
+        assert.matches("%+ %$env:PATH", joined)
+        local bundled = 0
+        for _, script in ipairs(powershell_scripts) do
+            if script:find("$env:MOON_TOOLCHAIN_ROOT", 1, true) then
+                bundled = bundled + 1
+                assert.is_true(#Runtime.checked_powershell_command(script) < 8191)
+            end
+        end
+        assert.equals(2, bundled)
         assert.matches("wasm%-gc", joined)
     end)
 

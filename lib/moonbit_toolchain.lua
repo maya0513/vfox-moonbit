@@ -313,7 +313,6 @@ function M:bundle(root, os_name)
         for _, arguments in ipairs(commands) do
             local command
             if os_name == "windows" then
-                local path = bin .. ";" .. (self.getenv("PATH") or "")
                 local command_parts = {
                     "&",
                     self.runtime.quote_powershell(moon),
@@ -326,7 +325,7 @@ function M:bundle(root, os_name)
                 local script = table.concat({
                     "$env:MOON_TOOLCHAIN_ROOT = " .. self.runtime.quote_powershell(root),
                     "$env:MOON_HOME = " .. self.runtime.quote_powershell(bundle_home),
-                    "$env:PATH = " .. self.runtime.quote_powershell(path),
+                    "$env:PATH = " .. self.runtime.quote_powershell(bin .. ";") .. " + $env:PATH",
                     table.concat(command_parts, " "),
                     "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
                 }, "; ")
