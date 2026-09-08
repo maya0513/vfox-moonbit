@@ -72,6 +72,20 @@ function M.quote_powershell(value)
     return "'" .. value:gsub("'", "''") .. "'"
 end
 
+local function concat_in_chunks(parts)
+    if #parts == 0 then
+        return ""
+    end
+    local chunks = {}
+    for first = 1, #parts, 128 do
+        chunks[#chunks + 1] = table.concat(parts, "", first, math.min(first + 127, #parts))
+    end
+    if #chunks == 1 then
+        return chunks[1]
+    end
+    return concat_in_chunks(chunks)
+end
+
 local function utf8_to_utf16le(value)
     local result = {}
     local index = 1
@@ -121,7 +135,7 @@ local function utf8_to_utf16le(value)
         end
         index = index + width
     end
-    return table.concat(result)
+    return concat_in_chunks(result)
 end
 
 local BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -142,7 +156,7 @@ local function base64_encode(value)
             or "="
         result[#result + 1] = third and BASE64_ALPHABET:sub(combined % 64 + 1, combined % 64 + 1) or "="
     end
-    return table.concat(result)
+    return concat_in_chunks(result)
 end
 
 function M.powershell_command(script)

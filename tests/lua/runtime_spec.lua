@@ -79,10 +79,12 @@ describe("MoonBit runtime adapter", function()
         assert.equals("Zg==", Runtime.base64_encode("f"))
         assert.equals("Zm8=", Runtime.base64_encode("fo"))
         assert.equals("Zm9v", Runtime.base64_encode("foo"))
+        assert.equals(string.rep("YWFh", 33) .. "YQ==", Runtime.base64_encode(string.rep("a", 100)))
         assert.equals(
             string.char(0x41, 0, 0xe9, 0, 0x08, 0x67, 0x3d, 0xd8, 0, 0xde),
             Runtime.utf8_to_utf16le("Aé月😀")
         )
+        assert.equals(string.rep("a\0", 129), Runtime.utf8_to_utf16le(string.rep("a", 129)))
         assert.equals(
             "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand QQA=",
             Runtime.powershell_command("A")
