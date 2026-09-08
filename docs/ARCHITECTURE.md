@@ -47,16 +47,17 @@ host executable prerequisite (`systemDependencies`). Runtimes predating the
 system-dependency preflight still receive the same actionable hard failure from
 `PostInstall`.
 
-The minimum standalone runtime is vfox 0.5.0. Versions 0.4.0 through 0.4.2
-contain the archiver implementation but do not preload it into plugin Lua
-states, so secure in-process core extraction is unavailable. The plugin does
-not fall back to an unverified external archive command.
+The tested standalone runtime baseline is vfox 1.0.12, and plugin metadata
+requires that version or newer. No maximum is imposed: newer compatible vfox
+runtimes are expected to work and replace the pinned baseline during routine
+toolchain refreshes. The plugin does not fall back to an unverified external
+archive command.
 
-The runtime adapter also normalizes the two real vfox extraction/context
-shapes: standalone vfox 0.x identifies the main SDK root through
-`ctx.sdkInfo.moonbit.path` and may strip a single archive root, while mise
-provides the install root directly and preserves `core/`. Only the verified
-`stage/core/moon.mod` and `stage/moon.mod` layouts are accepted.
+The runtime adapter also normalizes the real vfox extraction/context shapes:
+standalone vfox identifies the main SDK root through `ctx.sdkInfo.moonbit.path`
+and may strip a single archive root, while mise provides the install root
+directly and preserves `core/`. Only the verified `stage/core/moon.mod` and
+`stage/moon.mod` layouts are accepted.
 
 On Windows, GopherLua launches `os.execute` commands through `cmd.exe`, whose
 second round of parsing breaks command strings containing quoted paths. The
@@ -69,12 +70,43 @@ The additional-file hook is not used because mise and standalone vfox have had
 different handling semantics for additional archives. Core installation is a
 single explicit transaction under `PostInstall` instead.
 
-This environment split follows Moon's package-manager layout and the approach
-used by `moonbit-community/moonbit-overlay`: normal `moon` commands receive the
-immutable root through `MOON_TOOLCHAIN_ROOT`, while current native helpers are
-given both variables in a process-local shim. The overlay's Nix-specific
-patchelf, tinycc replacement, artifact mirror, historical/nightly channels,
-combined version identifier, and LLVM bundle are intentionally not adopted.
+## Comparison with moonbit-overlay
+
+This comparison is pinned to
+[`moonbit-community/moonbit-overlay` commit `831fa47`](https://github.com/moonbit-community/moonbit-overlay/tree/831fa47147eb8b9878b61d5d658102a699d8ea6b)
+so later overlay changes do not silently make the table inaccurate.
+
+| Concern | mise through vfox-moonbit | moonbit-overlay |
+| --- | --- | --- |
+| Primary role | A traditional vfox plugin selected and installed by mise; it also runs under standalone vfox. | A Nix flake/overlay exposing derivations, apps, and MoonBit project builders. |
+| Public versions | Stable `latest` only; an exact upstream version is accepted only for lockfiles and retries. | Stable `latest`, rolling `nightly`, and many historical exact package attributes. |
+| Version identity | Uses the exact upstream toolchain/core version, such as `0.x.y+build-id`. | Adds the `moon` source revision to the compiler version, such as `v0.x.y+compiler-rev+moon-rev`. |
+| Artifact origin | Downloads toolchain and core from the official MoonBit CDN and never redistributes either. | Uses official rolling URLs while updating, then publishes pinned toolchain/core archives on overlay GitHub Releases; nightly stays on the official CDN. |
+| Integrity and pairing | Verifies official toolchain SHA-256, vendored core SHA-256, exact core metadata, and a single version across all supported hosts. | Uses Nix fixed-output hashes for separately fetched toolchain and core derivations and joins the selected pair. |
+| Installation model | A mutable manager install directory is populated transactionally; a failed core promotion rolls back. | Toolchain and core are composed with `symlinkJoin` into an immutable Nix store result. |
+| `MOON_TOOLCHAIN_ROOT` | Exported as the selected install root for normal commands. | Wrapped into `moon` as the selected Nix store output. |
+| `MOON_HOME` | Preserves caller-owned mutable state; only `moon-lsp` and `moon-ide` shims set it to the install root for that process. | Preserves caller-owned state for `moon`; its current `moon-lsp` and `moon-ide` wrappers set both variables to the store output. |
+| `moonx` | Relative symlink on Unix; verified hardlink or copy on Windows. | Relative symlink to `moon`. |
+| Core bundles | Runs the two official installer bundles: `--all` and quiet `--target wasm-gc`. | Builds `--all`, `--target llvm`, and `--target wasm-gc`, all verbose. |
+| Current host records | Linux x86_64/arm64 glibc, macOS arm64, and Windows x86_64. | The pinned records currently contain Linux x86_64 and macOS arm64 hashes; its Nix target mapping also includes macOS x86_64. |
+| Linux adaptation | Leaves the official ELF payload unchanged; NixOS is best-effort with `nix-ld` or equivalent. | Applies `autoPatchelfHook` and replaces the bundled Linux `tcc` with nixpkgs `tinycc`. |
+| Project builds | Installs only the toolchain; project builds and registries remain MoonBit/mise user concerns. | Provides `buildMoonPackage`, cached-registry support, and a complete bundled `MOON_HOME` builder. |
+| Update path | Six-hour gated bot PR; immutable manifests, archive safety checks, installer-drift gates, required CI, then auto-merge. | Daily workflow fetches and executes the staged toolchain to derive a combined version, pushes version data to `master`, and creates mirrored releases. |
+
+The shared environment split is intentional: normal `moon` commands receive
+the immutable toolchain through `MOON_TOOLCHAIN_ROOT`, while current native
+helpers receive both variables in a process-local shim. Nix-specific patching,
+artifact mirroring, historical/nightly channels, the combined version, project
+builders, and the LLVM bundle remain outside this plugin's scope.
+
+## Compatibility verification policy
+
+CI verifies one current mise baseline (2026.9.2) and one current standalone
+vfox baseline (1.0.12) on every supported host. These are point-in-time tested
+versions, not compatibility bounds: newer compatible manager versions are
+expected to work, and the pinned versions move forward with routine
+development-tool updates. The project intentionally does not spend CI capacity
+maintaining older manager versions.
 
 ## Automated promotion
 

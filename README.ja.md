@@ -24,7 +24,8 @@ mise install
 mise exec -- moon version --all --json --no-path
 ```
 
-初期互換性 floor は mise 2026.5.12 です。
+CI で現在実動作を確認する基準版は mise 2026.9.2 です。これは上限ではなく、以降の
+mise も動作する想定です。開発 tool 更新時に CI の確認版も最新版へ追随させます。
 
 ## standalone vfox で使う
 
@@ -37,9 +38,8 @@ vfox install --yes moonbit@latest
 vfox exec moonbit@latest -- moon version --all --json --no-path
 ```
 
-`--yes` と `vfox exec` は vfox 1.0 以降の機能です。互換性 floor の vfox
-0.5.0 では `vfox install moonbit@latest` を実行して確認に応答した後、vfox を
-activate 済みの shell で `vfox use moonbit@latest` を使ってください。
+CI で現在実動作を確認する基準版は vfox 1.0.12 です。これは上限ではなく、以降の
+互換性がある vfox も動作する想定です。
 
 ## インストールの仕組み
 
@@ -131,7 +131,7 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` は format、lint、workflow security、Lua 5.1/5.4 unit test、manifest、
+`mise run ci` は format、lint、workflow security、Lua 5.1 unit test、manifest、
 line/branch coverage を検査します。GitHub Actions の実 E2E は全対応ホストで mise と
 standalone vfox の両方を検証します。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。

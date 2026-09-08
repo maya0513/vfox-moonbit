@@ -122,8 +122,8 @@ function M:validate_toolchain(root, os_name)
 end
 
 function M:staged_core(stage, os_name)
-    -- Standalone vfox 0.x strips an archive's single root directory while
-    -- mise's vfox backend preserves it. Normalize only these verified layouts.
+    -- Standalone vfox may strip an archive's single root directory while mise's
+    -- vfox backend preserves it. Normalize only these verified layouts.
     local nested = self.runtime.join(os_name, stage, "core")
     if file_exists(self.runtime.join(os_name, nested, "moon.mod"), self.opener) then
         return nested

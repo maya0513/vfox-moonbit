@@ -28,7 +28,9 @@ mise install
 mise exec -- moon version --all --json --no-path
 ```
 
-The initial compatibility floor is mise 2026.5.12.
+CI currently verifies mise 2026.9.2. This is the current tested baseline, not a
+maximum version: newer mise releases are expected to work and become the CI
+baseline when the development toolchain is refreshed.
 
 ## Install with standalone vfox
 
@@ -41,9 +43,8 @@ vfox install --yes moonbit@latest
 vfox exec moonbit@latest -- moon version --all --json --no-path
 ```
 
-The `--yes` flag and `vfox exec` require vfox 1.0 or newer. With the
-compatibility-floor vfox 0.5.0, run `vfox install moonbit@latest`, confirm the
-prompt, then activate a vfox-enabled shell and use `vfox use moonbit@latest`.
+CI currently verifies vfox 1.0.12. This is the current tested baseline, not a
+maximum version; newer compatible vfox releases are expected to work.
 
 ## What is installed
 
@@ -144,8 +145,8 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` checks formatting, lint, workflow security, Lua 5.1/5.4 unit
-tests, manifest invariants, and line/branch coverage. CI runs real downloads and
+`mise run ci` checks formatting, lint, workflow security, Lua 5.1 unit tests,
+manifest invariants, and line/branch coverage. CI runs real downloads and
 MoonBit fixture projects on every supported host through both mise and
 standalone vfox. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

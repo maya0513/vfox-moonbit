@@ -11,6 +11,11 @@ mise run bootstrap
 mise run ci
 ```
 
+The repository currently requires and verifies mise 2026.9.2 and vfox 1.0.12.
+They are moving tested baselines rather than maximum versions; update the
+configuration, lockfile, workflows, documentation, and metadata together when
+advancing either manager.
+
 Run the networked mise E2E separately with `mise run e2e`. Standalone vfox
 writes its own manager state under the current user's home, so that backend is
 run by GitHub-hosted ephemeral workers. To opt in locally, run:

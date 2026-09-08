@@ -44,7 +44,7 @@ describe("MoonBit runtime adapter", function()
         end
     end)
 
-    it("normalizes Lua 5.1 and 5.4 os.execute results", function()
+    it("normalizes numeric and tuple os.execute results", function()
         assert.is_true(Runtime.execute_succeeded(0))
         assert.is_false(Runtime.execute_succeeded(256))
         assert.is_true(Runtime.execute_succeeded(true, "exit", 0))

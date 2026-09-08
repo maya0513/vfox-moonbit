@@ -40,7 +40,7 @@ def test_build_is_deterministic_and_complete(tmp_path):
     assert first[1].read_text(encoding="ascii") == f"{digest}  vfox-moonbit-0.1.0.zip\n"
     manifest = json.loads(first[2].read_text(encoding="utf-8"))
     assert manifest["downloadUrl"].endswith("/v0.1.0/vfox-moonbit-0.1.0.zip")
-    assert manifest["minRuntimeVersion"] == "0.5.0"
+    assert manifest["minRuntimeVersion"] == "1.0.12"
 
     with zipfile.ZipFile(first[0]) as archive:
         assert archive.namelist() == sorted(archive.namelist())

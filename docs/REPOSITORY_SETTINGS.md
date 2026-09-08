@@ -19,7 +19,7 @@ Create a ruleset targeting `main` with no GitHub App bypass:
 - require conversation resolution;
 - require CODEOWNERS approval when a matched path changes;
 - require the stable `required` aggregate check, which depends on `quality`,
-  mise lock compatibility, and all mise/vfox E2E jobs;
+  current-baseline mise lock validation, and all mise/vfox E2E jobs;
 - require branches to be up to date before merge;
 - block force pushes and deletion;
 - allow squash merge only.
