@@ -170,7 +170,7 @@ describe("MoonBit post-install", function()
         assert.equals("dead", coroutine.status(thread))
     end)
 
-    it("normalizes the root-stripping archiver used by standalone vfox 0.x", function()
+    it("normalizes the root-stripping archiver used by standalone vfox", function()
         local root = temp_root()
         make_toolchain(root)
         local deps = dependencies(root, {

@@ -311,6 +311,7 @@ function M:bundle(root, os_name)
     self.runtime.make_dir(bundle_home, os_name, self.executor)
     local ok, bundle_error = pcall(function()
         for _, arguments in ipairs(commands) do
+            print("vfox-moonbit: moon " .. table.concat(arguments, " "))
             local command
             if os_name == "windows" then
                 local command_parts = {

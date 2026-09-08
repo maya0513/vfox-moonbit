@@ -77,7 +77,7 @@ function M:install(ctx, runtime_global)
     local document = self.manifest:exact(version)
     local artifact = document.platforms[platform].core
     local extension = artifact.format == "zip" and "zip" or "tar.gz"
-    -- Keep the final archive suffix: mise and legacy vfox detect the format from the
+    -- Keep the final archive suffix: mise and standalone vfox detect the format from the
     -- path, while the .part marker still makes incomplete files unambiguous.
     local archive = self.runtime.join(os_name, root, ".vfox-moonbit-core.part." .. extension)
     local stage = self.runtime.join(os_name, root, ".vfox-moonbit-core-stage")
@@ -101,11 +101,13 @@ function M:install(ctx, runtime_global)
     self.runtime.remove_tree(stage, os_name, self.executor)
     self.runtime.make_dir(stage, os_name, self.executor)
 
+    print("vfox-moonbit: downloading matching core for " .. version)
     local download_error = self.http.download_file({ url = artifact.url, headers = {} }, archive)
     if download_error ~= nil then
         abort("failed to download the matching MoonBit core: " .. tostring(download_error))
     end
 
+    print("vfox-moonbit: verifying core SHA-256")
     local hash_ok, actual = pcall(Sha256.file, archive, self.sha_module, self.opener)
     if not hash_ok then
         abort(actual)
@@ -115,6 +117,7 @@ function M:install(ctx, runtime_global)
     end
 
     local archive_module = self.runtime.archiver(self.archiver)
+    print("vfox-moonbit: extracting verified core")
     local extract_error = archive_module.decompress(archive, stage)
     if extract_error ~= nil then
         abort("failed to extract the verified MoonBit core: " .. tostring(extract_error))
@@ -122,6 +125,7 @@ function M:install(ctx, runtime_global)
 
     local ok, install_error = pcall(function()
         local stage_core = self:_staged_core(stage, os_name)
+        print("vfox-moonbit: preparing core bundles")
         self.toolchain:install_core_and_prepare(stage_core, destination, backup, root, version, os_name)
     end)
 

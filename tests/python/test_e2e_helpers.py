@@ -13,68 +13,12 @@ from scripts import e2e
 REPO = Path(__file__).resolve().parents[2]
 
 
-def test_exact_version_and_exec_version_detection(tmp_path):
+def test_exact_version(tmp_path):
     assert e2e.exact_version(REPO).startswith("0.")
-    assert e2e.vfox_supports_exec("vfox version 1.0.0")
-    assert not e2e.vfox_supports_exec("vfox version 0.4.0")
-    assert not e2e.vfox_supports_exec("unknown")
     (tmp_path / "releases").mkdir()
     (tmp_path / "releases" / "latest.json").write_text(json.dumps({"version": "latest"}), encoding="utf-8")
     with pytest.raises(e2e.E2EError, match="supported exact"):
         e2e.exact_version(tmp_path)
-
-
-def test_remove_legacy_vfox_artifacts_is_exactly_scoped(tmp_path):
-    vfox_home = tmp_path / "configured"
-    user_home = tmp_path / "home"
-    alias = "moonbit-e2e-123"
-    keep = user_home / ".version-fox" / "plugin" / "moonbit-user-plugin"
-    keep.mkdir(parents=True)
-    (keep / "metadata.lua").write_text("keep", encoding="utf-8")
-
-    for base in (vfox_home, user_home / ".version-fox", user_home / ".vfox"):
-        for category in ("plugin", "plugins", "cache"):
-            generated = base / category / alias
-            generated.mkdir(parents=True)
-            (generated / "generated").write_text("test", encoding="utf-8")
-
-    e2e.remove_legacy_vfox_artifacts(alias, env={"VFOX_HOME": str(vfox_home)}, user_home=user_home)
-    assert (keep / "metadata.lua").read_text(encoding="utf-8") == "keep"
-    assert not any(path.name == alias for path in tmp_path.rglob(alias))
-
-    with pytest.raises(e2e.E2EError, match="unexpected vfox alias"):
-        e2e.remove_legacy_vfox_artifacts("moonbit", env={"VFOX_HOME": str(vfox_home)}, user_home=user_home)
-
-
-def test_parse_vfox_environment(tmp_path):
-    root = tmp_path / "install root"
-    (root / "bin").mkdir(parents=True)
-    (root / "shims").mkdir()
-    output = "notice\n" + json.dumps(
-        {
-            "is_hook_env": False,
-            "paths": [str(root / "shims"), str(root / "bin")],
-            "sdks": {"moonbit": {"MOON_TOOLCHAIN_ROOT": str(root)}},
-        }
-    )
-    assert e2e.parse_vfox_environment(output, root) == ([str(root / "shims"), str(root / "bin")], str(root))
-
-    with pytest.raises(e2e.E2EError, match="JSON object"):
-        e2e.parse_vfox_environment("not json", root)
-    with pytest.raises(e2e.E2EError, match="unexpected schema"):
-        e2e.parse_vfox_environment("{}", root)
-    with pytest.raises(e2e.E2EError, match="expected shim/bin PATH"):
-        e2e.parse_vfox_environment(json.dumps({"paths": [], "sdks": {}}), root)
-    with pytest.raises(e2e.E2EError, match="must not override"):
-        e2e.parse_vfox_environment(
-            json.dumps(
-                {
-                    "paths": [str(root / "shims"), str(root / "bin")],
-                    "sdks": {"moonbit": {"MOON_TOOLCHAIN_ROOT": str(root), "MOON_HOME": str(root)}},
-                }
-            ),
-            root,
-        )
 
 
 def test_find_vfox_root_normalizes_the_version_container(tmp_path, monkeypatch):
@@ -198,3 +142,27 @@ def test_run_reports_success_and_failure(tmp_path):
     assert success.stdout == "ok\n"
     with pytest.raises(e2e.E2EError, match="exited 3"):
         e2e.run([os.fspath(Path(os.sys.executable)), "-c", "raise SystemExit(3)"], cwd=tmp_path, env=env)
+
+
+def test_run_preserves_timeout_output(tmp_path, monkeypatch, capsys):
+    def time_out(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(
+            ["tool", "--flag"],
+            7,
+            output=b"partial stdout\n",
+            stderr=b"partial stderr",
+        )
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 7 seconds: tool --flag"):
+        e2e.run(["tool", "--flag"], cwd=tmp_path, env={"PATH": os.environ.get("PATH", "")}, timeout=7)
+    captured = capsys.readouterr()
+    assert captured.out == "$ tool --flag\npartial stdout\n"
+    assert captured.err == "partial stderr\n"
+
+    def time_out_without_output(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(["tool"], 3)
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out_without_output)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 3 seconds: tool"):
+        e2e.run(["tool"], cwd=tmp_path, env={}, timeout=3)

@@ -25,7 +25,6 @@ from scripts import package_plugin
 EXACT_VERSION_RE: Final = re.compile(r"^0\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\+[0-9A-Za-z][0-9A-Za-z._-]*$")
 REQUIRED_EXECUTABLES: Final = ("moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp", "moon-ide")
 HELPER_EXECUTABLES: Final = ("moon-lsp", "moon-ide")
-E2E_ALIAS_RE: Final = re.compile(r"^moonbit-e2e-[1-9][0-9]*$")
 
 
 class E2EError(RuntimeError):
@@ -62,16 +61,25 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     display = " ".join(str(part) for part in command)
     print(f"$ {display}", flush=True)
-    result = subprocess.run(  # noqa: S603 - commands are fixed by this integration harness.
-        [str(part) for part in command],
-        cwd=cwd,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        input=input_text,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603 - commands are fixed by this integration harness.
+            [str(part) for part in command],
+            cwd=cwd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            input=input_text,
+        )
+    except subprocess.TimeoutExpired as error:
+        stdout = (error.stdout or b"").decode("utf-8", errors="replace")
+        stderr = (error.stderr or b"").decode("utf-8", errors="replace")
+        if stdout:
+            print(stdout, end="" if stdout.endswith("\n") else "\n")
+        if stderr:
+            print(stderr, end="" if stderr.endswith("\n") else "\n", file=sys.stderr)
+        raise E2EError(f"command timed out after {timeout} seconds: {display}") from error
     if result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
     if result.stderr:
@@ -298,67 +306,6 @@ def run_mise(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]
     )
 
 
-def vfox_supports_exec(version_output: str) -> bool:
-    match = re.search(r"(?:version\s+)?(\d+)\.(\d+)\.(\d+)", version_output)
-    return bool(match and int(match.group(1)) >= 1)
-
-
-def remove_legacy_vfox_artifacts(
-    alias: str,
-    *,
-    env: dict[str, str],
-    user_home: Path | None = None,
-) -> None:
-    if not E2E_ALIAS_RE.fullmatch(alias):
-        raise E2EError(f"refusing to clean an unexpected vfox alias: {alias}")
-
-    home = user_home or Path.home()
-    bases = [Path(env["VFOX_HOME"]), home / ".version-fox", home / ".vfox"]
-    targets: list[Path] = []
-    for base in bases:
-        for category in ("plugin", "plugins", "cache"):
-            target = base / category / alias
-            if target not in targets:
-                targets.append(target)
-
-    for target in targets:
-        if target.is_symlink() or target.is_file():
-            target.unlink()
-        elif target.is_dir():
-            shutil.rmtree(target)
-
-    remaining = [target for target in targets if target.exists() or target.is_symlink()]
-    if remaining:
-        raise E2EError(f"legacy vfox cleanup left generated paths behind: {remaining}")
-
-
-def parse_vfox_environment(output: str, root: Path) -> tuple[list[str], str]:
-    try:
-        document = json.loads(next(line for line in reversed(output.splitlines()) if line.strip().startswith("{")))
-    except (StopIteration, json.JSONDecodeError) as error:
-        raise E2EError("vfox env --json did not return a JSON object") from error
-    paths = document.get("paths")
-    sdks = document.get("sdks")
-    if not isinstance(paths, list) or not isinstance(sdks, dict):
-        raise E2EError("vfox env --json has an unexpected schema")
-    expected = [(root / "shims").resolve(), (root / "bin").resolve()]
-    string_paths = [value for value in paths if isinstance(value, str)]
-    normalized_paths = [Path(value).resolve() for value in string_paths]
-    positions = [[index for index, value in enumerate(normalized_paths) if value == item] for item in expected]
-    matching_sdks = [
-        variables
-        for variables in sdks.values()
-        if isinstance(variables, dict)
-        and isinstance(variables.get("MOON_TOOLCHAIN_ROOT"), str)
-        and Path(variables["MOON_TOOLCHAIN_ROOT"]).resolve() == root.resolve()
-    ]
-    if any(len(indices) != 1 for indices in positions) or positions[0][0] >= positions[1][0] or len(matching_sdks) != 1:
-        raise E2EError("standalone vfox did not export the expected shim/bin PATH and toolchain root")
-    if "MOON_HOME" in matching_sdks[0]:
-        raise E2EError("standalone vfox must not override mutable MOON_HOME")
-    return [string_paths[positions[0][0]], string_paths[positions[1][0]]], matching_sdks[0]["MOON_TOOLCHAIN_ROOT"]
-
-
 def run_vfox(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]) -> None:
     if shutil.which("vfox", path=env.get("PATH")) is None:
         raise E2EError("vfox is not available on PATH")
@@ -367,31 +314,16 @@ def run_vfox(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]
     alias = f"moonbit-e2e-{os.getpid()}"
     vfox_home = Path(env["VFOX_HOME"])
     (vfox_home / "plugin").mkdir(parents=True, exist_ok=True)
-    version_output = run(["vfox", "--version"], cwd=workspace, env=env).stdout
-    modern_cli = vfox_supports_exec(version_output)
+    run(["vfox", "--version"], cwd=workspace, env=env)
     added = False
-    installed = False
     primary_failed = False
     try:
         run(["vfox", "add", "--source", archive, alias], cwd=workspace, env=env)
         added = True
-        install_command = ["vfox", "install"]
-        if modern_cli:
-            install_command.append("--yes")
-        install_command.append(f"{alias}@latest")
-        run(install_command, cwd=workspace, env=env, input_text=None if modern_cli else "y\n")
-        installed = True
+        run(["vfox", "install", "--yes", f"{alias}@latest"], cwd=workspace, env=env, timeout=300)
         root = find_vfox_root(alias, version, cwd=workspace, env=env)
         validate_install(root, version)
-        if modern_cli:
-            prefix = ["vfox", "exec", f"{alias}@{version}", "--"]
-        else:
-            run(["vfox", "use", "--session", f"{alias}@{version}"], cwd=workspace, env=env)
-            environment = run(["vfox", "env", "--json"], cwd=workspace, env=env)
-            managed_paths, toolchain_root = parse_vfox_environment(environment.stdout, root)
-            env["MOON_TOOLCHAIN_ROOT"] = toolchain_root
-            env["PATH"] = os.pathsep.join([*managed_paths, env["PATH"]])
-            prefix = []
+        prefix = ["vfox", "exec", f"{alias}@{version}", "--"]
         validate_commands(prefix, root, version, workspace=workspace, env=env)
     except BaseException:
         primary_failed = True
@@ -399,12 +331,7 @@ def run_vfox(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]
     finally:
         if added:
             try:
-                if modern_cli:
-                    run(["vfox", "remove", "--yes", alias], cwd=workspace, env=env, timeout=30)
-                else:
-                    if installed:
-                        run(["vfox", "uninstall", f"{alias}@{version}"], cwd=workspace, env=env, timeout=30)
-                    remove_legacy_vfox_artifacts(alias, env=env)
+                run(["vfox", "remove", "--yes", alias], cwd=workspace, env=env, timeout=30)
             except (E2EError, OSError, subprocess.SubprocessError) as cleanup_error:
                 if not primary_failed:
                     raise
