@@ -73,8 +73,12 @@ def run(
             input=input_text,
         )
     except subprocess.TimeoutExpired as error:
-        stdout = (error.stdout or b"").decode("utf-8", errors="replace")
-        stderr = (error.stderr or b"").decode("utf-8", errors="replace")
+        stdout = (
+            error.stdout.decode("utf-8", errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""
+        )
+        stderr = (
+            error.stderr.decode("utf-8", errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""
+        )
         if stdout:
             print(stdout, end="" if stdout.endswith("\n") else "\n")
         if stderr:

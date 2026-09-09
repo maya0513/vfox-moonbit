@@ -149,8 +149,8 @@ def test_run_preserves_timeout_output(tmp_path, monkeypatch, capsys):
         raise subprocess.TimeoutExpired(
             ["tool", "--flag"],
             7,
-            output=b"partial stdout\n",
-            stderr=b"partial stderr",
+            output="partial stdout\n",
+            stderr="partial stderr",
         )
 
     monkeypatch.setattr(e2e.subprocess, "run", time_out)
@@ -159,6 +159,16 @@ def test_run_preserves_timeout_output(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert captured.out == "$ tool --flag\npartial stdout\n"
     assert captured.err == "partial stderr\n"
+
+    def time_out_with_bytes(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(["tool"], 5, output=b"byte stdout", stderr=b"byte stderr\n")
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out_with_bytes)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 5 seconds: tool"):
+        e2e.run(["tool"], cwd=tmp_path, env={}, timeout=5)
+    captured = capsys.readouterr()
+    assert captured.out == "$ tool\nbyte stdout\n"
+    assert captured.err == "byte stderr\n"
 
     def time_out_without_output(*_args, **_kwargs):
         raise subprocess.TimeoutExpired(["tool"], 3)
