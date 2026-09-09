@@ -40,7 +40,10 @@ archive directly. Replace `0.1.0` with the current plugin release version:
 ```shell
 vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
 vfox install --yes moonbit@latest
+# Linux and macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
+# Windows with vfox 1.0.12 (its `exec` PATH lookup requires the suffix)
+vfox exec moonbit@latest -- moon.exe version --all --json --no-path
 ```
 
 CI currently verifies vfox 1.0.12. This is the current tested baseline, not a

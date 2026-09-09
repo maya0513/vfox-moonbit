@@ -229,7 +229,13 @@ def managed_run(
     return run([*prefix, *command], cwd=cwd, env=env)
 
 
+def executable_name(name: str, os_name: str) -> str:
+    return f"{name}.exe" if os_name == "nt" else name
+
+
 def validate_commands(prefix: Sequence[str], root: Path, version: str, *, workspace: Path, env: dict[str, str]) -> None:
+    moon = executable_name("moon", os.name)
+    moonx = executable_name("moonx", os.name)
     expected_home = Path(env["MOON_HOME"]).resolve()
     probe = managed_run(
         prefix,
@@ -259,7 +265,7 @@ def validate_commands(prefix: Sequence[str], root: Path, version: str, *, worksp
 
     version_result = managed_run(
         prefix,
-        ["moon", "version", "--all", "--json", "--no-path"],
+        [moon, "version", "--all", "--json", "--no-path"],
         cwd=workspace,
         env=env,
     )
@@ -273,20 +279,20 @@ def validate_commands(prefix: Sequence[str], root: Path, version: str, *, worksp
     project = workspace / "fixture project"
     managed_run(
         prefix,
-        ["moon", "new", "--user", "vfox-e2e", "--name", "smoke", str(project)],
+        [moon, "new", "--user", "vfox-e2e", "--name", "smoke", str(project)],
         cwd=workspace,
         env=env,
     )
-    managed_run(prefix, ["moon", "check"], cwd=project, env=env)
-    managed_run(prefix, ["moon", "test"], cwd=project, env=env)
-    managed_run(prefix, ["moon", "run", "cmd/main"], cwd=project, env=env)
+    managed_run(prefix, [moon, "check"], cwd=project, env=env)
+    managed_run(prefix, [moon, "test"], cwd=project, env=env)
+    managed_run(prefix, [moon, "run", "cmd/main"], cwd=project, env=env)
     # moonx selects package-runner behaviour from argv[0]; it is not a second
     # spelling of the `moon` CLI, so `moonx version` is intentionally invalid.
-    moonx_help = managed_run(prefix, ["moonx", "--help"], cwd=project, env=env)
+    moonx_help = managed_run(prefix, [moonx, "--help"], cwd=project, env=env)
     if "package" not in (moonx_help.stdout + moonx_help.stderr).lower():
         raise E2EError("moonx did not identify itself as the package runner")
-    managed_run(prefix, ["moon", "lsp", "--version"], cwd=project, env=env)
-    managed_run(prefix, ["moon", "ide", "--help"], cwd=project, env=env)
+    managed_run(prefix, [moon, "lsp", "--version"], cwd=project, env=env)
+    managed_run(prefix, [moon, "ide", "--help"], cwd=project, env=env)
     if tree_fingerprint(root) != install_before:
         raise E2EError("MoonBit commands modified the managed installation root")
 

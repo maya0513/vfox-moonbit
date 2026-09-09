@@ -21,6 +21,11 @@ def test_exact_version(tmp_path):
         e2e.exact_version(tmp_path)
 
 
+def test_executable_name_uses_the_windows_suffix():
+    assert e2e.executable_name("moon", "posix") == "moon"
+    assert e2e.executable_name("moon", "nt") == "moon.exe"
+
+
 def test_find_vfox_root_normalizes_the_version_container(tmp_path, monkeypatch):
     version = "0.1.2+abc"
     container = tmp_path / "vfox" / "cache" / "moonbit-e2e-123" / f"v-{version}"

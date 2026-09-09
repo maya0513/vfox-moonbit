@@ -35,7 +35,10 @@ public registry 採用前は Release の ZIP を直接追加します。`0.1.0` 
 ```shell
 vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
 vfox install --yes moonbit@latest
+# Linux / macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
+# Windows + vfox 1.0.12（`exec` のPATH検索では拡張子が必要）
+vfox exec moonbit@latest -- moon.exe version --all --json --no-path
 ```
 
 CI で現在実動作を確認する基準版は vfox 1.0.12 です。これは上限ではなく、以降の
