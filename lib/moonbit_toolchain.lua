@@ -1,5 +1,4 @@
 local Runtime = require("moonbit_runtime")
-local Sha256 = require("moonbit_sha256")
 
 local M = {}
 M.__index = M
@@ -90,6 +89,38 @@ local function copy_file(source, destination, opener)
     input:close()
     output:close()
     return true
+end
+
+local function files_equal(source, destination, opener)
+    local source_handle, source_error = opener(source, "rb")
+    if not source_handle then
+        return nil, source_error
+    end
+    local destination_handle, destination_error = opener(destination, "rb")
+    if not destination_handle then
+        source_handle:close()
+        return nil, destination_error
+    end
+
+    while true do
+        local source_chunk, source_read_error = source_handle:read(1024 * 1024)
+        local destination_chunk, destination_read_error = destination_handle:read(1024 * 1024)
+        if source_read_error or destination_read_error then
+            source_handle:close()
+            destination_handle:close()
+            return nil, source_read_error or destination_read_error
+        end
+        if source_chunk ~= destination_chunk then
+            source_handle:close()
+            destination_handle:close()
+            return false
+        end
+        if source_chunk == nil then
+            source_handle:close()
+            destination_handle:close()
+            return true
+        end
+    end
 end
 
 function M.new(dependencies)
@@ -238,10 +269,10 @@ function M:make_moonx(root, os_name)
                 error("cannot create moonx.exe: " .. tostring(copy_error))
             end
         end
-        local moon_hash = Sha256.file(moon, self.sha_module, self.opener)
-        local moonx_hash = Sha256.file(moonx, self.sha_module, self.opener)
-        if moon_hash ~= moonx_hash then
-            error("moonx.exe does not match moon.exe after link/copy")
+        local matching, compare_error = files_equal(moon, moonx, self.opener)
+        if not matching then
+            local detail = compare_error and ": " .. tostring(compare_error) or ""
+            error("moonx.exe does not match moon.exe after link/copy" .. detail)
         end
     else
         self.runtime.run("ln -sfn moon " .. self.runtime.quote_unix(moonx), self.executor)
@@ -366,7 +397,9 @@ function M:install_core_and_prepare(stage_core, destination, backup, root, versi
     local ok, prepare_error = pcall(function()
         self:repair_permissions(root, os_name)
         self:bundle(root, os_name)
+        print("vfox-moonbit: creating moonx")
         self:make_moonx(root, os_name)
+        print("vfox-moonbit: creating helper shims")
         self:make_helper_shims(root, os_name)
     end)
     if not ok then
@@ -385,6 +418,7 @@ M.REQUIRED_EXECUTABLES = REQUIRED_EXECUTABLES
 M.HELPER_EXECUTABLES = HELPER_EXECUTABLES
 M.copy_file = copy_file
 M.file_exists = file_exists
+M.files_equal = files_equal
 M.moon_mod_version = moon_mod_version
 M.read_all = read_all
 M.write_all = write_all

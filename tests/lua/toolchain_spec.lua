@@ -164,6 +164,60 @@ describe("MoonBit toolchain preparation", function()
         assert.equals("close failed", reason)
     end)
 
+    it("compares moonx candidates a chunk at a time", function()
+        local root = temp_root()
+        local source = root .. "/moon.exe"
+        local destination = root .. "/moonx.exe"
+        write(source, "same bytes")
+        write(destination, "same bytes")
+        assert.is_true(Toolchain.files_equal(source, destination, io.open))
+
+        write(destination, "different bytes")
+        assert.is_false(Toolchain.files_equal(source, destination, io.open))
+
+        local equal, reason = Toolchain.files_equal("missing", destination, function(path, mode)
+            return io.open(path, mode)
+        end)
+        assert.is_nil(equal)
+        assert.is_truthy(reason)
+
+        local source_closed = false
+        equal, reason = Toolchain.files_equal("source", "missing", function(path)
+            if path == "source" then
+                return {
+                    close = function()
+                        source_closed = true
+                    end,
+                }
+            end
+            return nil, "destination missing"
+        end)
+        assert.is_nil(equal)
+        assert.equals("destination missing", reason)
+        assert.is_true(source_closed)
+
+        local closed = 0
+        local calls = 0
+        equal, reason = Toolchain.files_equal("source", "destination", function()
+            calls = calls + 1
+            local index = calls
+            return {
+                read = function()
+                    if index == 1 then
+                        return nil, "read failed"
+                    end
+                    return nil
+                end,
+                close = function()
+                    closed = closed + 1
+                end,
+            }
+        end)
+        assert.is_nil(equal)
+        assert.equals("read failed", reason)
+        assert.equals(2, closed)
+    end)
+
     it("cleans the temporary home when bundling or cleanup fails", function()
         local function runtime_with_cleanup(remove_tree)
             return {
