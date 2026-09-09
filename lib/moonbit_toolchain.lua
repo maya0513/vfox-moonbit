@@ -14,6 +14,7 @@ local REQUIRED_EXECUTABLES = {
 }
 
 local HELPER_EXECUTABLES = { "moon-lsp", "moon-ide" }
+local FILE_CHUNK_SIZE = 1024 * 1024
 
 local function read_all(path, opener)
     local handle, open_error = opener(path, "rb")
@@ -75,7 +76,7 @@ local function copy_file(source, destination, opener)
         return nil, output_error
     end
     while true do
-        local chunk = input:read(1024 * 1024)
+        local chunk = input:read(FILE_CHUNK_SIZE)
         if not chunk then
             break
         end
@@ -103,8 +104,8 @@ local function files_equal(source, destination, opener)
     end
 
     while true do
-        local source_chunk, source_read_error = source_handle:read(1024 * 1024)
-        local destination_chunk, destination_read_error = destination_handle:read(1024 * 1024)
+        local source_chunk, source_read_error = source_handle:read(FILE_CHUNK_SIZE)
+        local destination_chunk, destination_read_error = destination_handle:read(FILE_CHUNK_SIZE)
         if source_read_error or destination_read_error then
             source_handle:close()
             destination_handle:close()
@@ -127,7 +128,6 @@ function M.new(dependencies)
     dependencies = dependencies or {}
     return setmetatable({
         runtime = dependencies.runtime or Runtime,
-        sha_module = dependencies.sha_module,
         opener = dependencies.opener or io.open,
         executor = dependencies.executor or os.execute,
         rename = dependencies.rename or os.rename,

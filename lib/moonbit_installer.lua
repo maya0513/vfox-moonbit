@@ -6,10 +6,6 @@ local Toolchain = require("moonbit_toolchain")
 local M = {}
 M.__index = M
 
-local function stringify_error(message)
-    return tostring(message)
-end
-
 function M.new(dependencies)
     dependencies = dependencies or {}
     local runtime = dependencies.runtime or Runtime
@@ -17,7 +13,6 @@ function M.new(dependencies)
     if not toolchain then
         toolchain = Toolchain.new({
             runtime = runtime,
-            sha_module = dependencies.sha_module,
             opener = dependencies.opener,
             executor = dependencies.executor,
             rename = dependencies.rename,
@@ -38,29 +33,6 @@ function M.new(dependencies)
     }, M)
 end
 
--- Keep a small test seam at the installer boundary while toolchain mutation
--- itself lives in moonbit_toolchain.
-function M:_required_toolchain(root, os_name)
-    return self.toolchain:validate_toolchain(root, os_name)
-end
-
-function M:_staged_core(stage, os_name)
-    return self.toolchain:staged_core(stage, os_name)
-end
-
-function M:_install_core(stage_core, destination, backup, _, os_name)
-    local transaction = self.toolchain:promote_core(stage_core, destination, backup, os_name)
-    return self.toolchain:commit_core(transaction)
-end
-
-function M:_make_moonx(root, os_name)
-    return self.toolchain:make_moonx(root, os_name)
-end
-
-function M:_bundle(root, os_name)
-    return self.toolchain:bundle(root, os_name)
-end
-
 function M:install(ctx, runtime_global)
     local root, version = self.runtime.context(ctx)
     if not Manifest.is_exact_version(version) then
@@ -70,7 +42,7 @@ function M:install(ctx, runtime_global)
     if not self.runtime.command_exists("git", os_name, self.executor) then
         error("Git is required by MoonBit but was not found on PATH; install Git and retry the mise/vfox installation")
     end
-    self:_required_toolchain(root, os_name)
+    self.toolchain:validate_toolchain(root, os_name)
 
     -- Refetch the immutable exact record. Never refetch latest here: latest may
     -- have advanced since PreInstall selected the toolchain.
@@ -124,19 +96,15 @@ function M:install(ctx, runtime_global)
     end
 
     local ok, install_error = pcall(function()
-        local stage_core = self:_staged_core(stage, os_name)
+        local stage_core = self.toolchain:staged_core(stage, os_name)
         print("vfox-moonbit: preparing core bundles")
         self.toolchain:install_core_and_prepare(stage_core, destination, backup, root, version, os_name)
     end)
 
     cleanup()
     if not ok then
-        error(stringify_error(install_error), 0)
+        error(tostring(install_error), 0)
     end
 end
-
-M.copy_file = Toolchain.copy_file
-M.moon_mod_version = Toolchain.moon_mod_version
-M.stringify_error = stringify_error
 
 return M
