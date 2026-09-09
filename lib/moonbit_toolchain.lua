@@ -311,7 +311,8 @@ function M:bundle(root, os_name)
     self.runtime.make_dir(bundle_home, os_name, self.executor)
     local ok, bundle_error = pcall(function()
         for _, arguments in ipairs(commands) do
-            print("vfox-moonbit: moon " .. table.concat(arguments, " "))
+            local description = "moon " .. table.concat(arguments, " ")
+            print("vfox-moonbit: " .. description)
             local command
             if os_name == "windows" then
                 local command_parts = {
@@ -347,6 +348,7 @@ function M:bundle(root, os_name)
                 command = table.concat(pieces, " ")
             end
             self.runtime.run(command, self.executor)
+            print("vfox-moonbit: completed " .. description)
         end
     end)
     local cleanup_ok, cleanup_error = pcall(self.runtime.remove_tree, bundle_home, os_name, self.executor)

@@ -86,7 +86,7 @@ describe("MoonBit runtime adapter", function()
         )
         assert.equals(string.rep("a\0", 129), Runtime.utf8_to_utf16le(string.rep("a", 129)))
         assert.equals(
-            "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand QQA=",
+            "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand QQA= <NUL",
             Runtime.powershell_command("A")
         )
         assert.equals(

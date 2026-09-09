@@ -161,7 +161,8 @@ end
 
 function M.powershell_command(script)
     local encoded = base64_encode(utf8_to_utf16le(script))
-    return "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " .. encoded
+    local prefix = "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "
+    return prefix .. encoded .. " <NUL"
 end
 
 function M.checked_powershell_command(script)
