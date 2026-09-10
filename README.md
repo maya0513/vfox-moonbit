@@ -28,7 +28,9 @@ mise install
 mise exec -- moon version --all --json --no-path
 ```
 
-The initial compatibility floor is mise 2026.5.12.
+CI currently verifies mise 2026.9.2. This is the current tested baseline, not a
+maximum version: newer mise releases are expected to work and become the CI
+baseline when the development toolchain is refreshed.
 
 ## Install with standalone vfox
 
@@ -38,11 +40,14 @@ archive directly. Replace `0.1.0` with the current plugin release version:
 ```shell
 vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
 vfox install --yes moonbit@latest
+# Linux and macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
+# Windows with vfox 1.0.12 (its `exec` PATH lookup requires the suffix)
+vfox exec moonbit@latest -- moon.exe version --all --json --no-path
 ```
 
-`vfox exec` requires vfox 1.0 or newer. With the compatibility-floor vfox
-0.4.0, activate a vfox-enabled shell and use `vfox use moonbit@latest` instead.
+CI currently verifies vfox 1.0.12. This is the current tested baseline, not a
+maximum version; newer compatible vfox releases are expected to work.
 
 ## What is installed
 
@@ -56,8 +61,11 @@ archive for each stable build. The plugin treats them as one release:
 - installation refetches that exact manifest, streams core to a `.part` file,
   verifies it before extraction, checks `core/moon.mod`, and runs the two bundle
   commands used by MoonBit's official installers;
-- `PATH` points to `<install-root>/bin` and `MOON_HOME` points to the exact
-  install root.
+- `PATH` selects `<install-root>/shims` and `<install-root>/bin`, while
+  `MOON_TOOLCHAIN_ROOT` identifies the immutable toolchain and matching core;
+- `MOON_HOME` remains the caller's mutable user-state directory. Compatibility
+  shims set it to the toolchain root only for `moon-lsp` and `moon-ide`, whose
+  current binaries still use it to locate core.
 
 The plugin never mirrors or redistributes MoonBit binaries. A historical exact
 manifest remains in this repository, but reinstalling it is not guaranteed if
@@ -84,17 +92,19 @@ configured `nix-ld`; it is not a supported test target.
 
 Git is required by MoonBit. Native targets may also need the platform tools and
 libraries required by the selected MoonBit backend; those are outside this
-plugin's scope.
+plugin's scope. On Windows, installation uses the in-box Windows PowerShell
+(`powershell.exe`) for path-safe filesystem and bundle operations.
 
 ## State, login, and editors
 
-The plugin does not write `~/.moon`, shell startup files, or credentials.
-MoonBit's authentication, package index, and caches live under the versioned
-`MOON_HOME`, so after an upgrade you may need to run `moon login` again. This
-is deliberate isolation: credentials are not copied between toolchain roots.
+The plugin installer does not write `~/.moon`, shell startup files, or
+credentials. MoonBit's authentication, package index, and caches use the normal
+mutable `MOON_HOME` (defaulting to `~/.moon`) and are therefore retained when
+mise/vfox selects a newer toolchain. An existing custom `MOON_HOME` is
+preserved.
 
-Start an editor from the managed environment so its LSP resolves the same
-toolchain and core:
+Start an editor from the managed environment so `MOON_TOOLCHAIN_ROOT` and the
+helper shims make its LSP/IDE resolve the same toolchain and core:
 
 ```shell
 mise exec -- code .
@@ -138,8 +148,8 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` checks formatting, lint, workflow security, Lua 5.1/5.4 unit
-tests, manifest invariants, and line/branch coverage. CI runs real downloads and
+`mise run ci` checks formatting, lint, workflow security, Lua 5.1 unit tests,
+manifest invariants, and line/branch coverage. CI runs real downloads and
 MoonBit fixture projects on every supported host through both mise and
 standalone vfox. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

@@ -45,6 +45,9 @@ def test_owner_checks_metadata_config_and_placeholders(tmp_path):
         check_repository.check_owner(tmp_path)
 
     shutil.copy(REPO / "lib" / "moonbit_config.lua", config)
+    (tmp_path / ".mise").mkdir()
+    (tmp_path / ".mise" / "generated.txt").write_text("<" + "owner>/vfox-moonbit", encoding="utf-8")
+    check_repository.check_owner(tmp_path)
     (tmp_path / "README.md").write_text("publish at " + "<" + "owner>/vfox-moonbit", encoding="utf-8")
     with pytest.raises(check_repository.RepositoryError, match="placeholder"):
         check_repository.check_owner(tmp_path)

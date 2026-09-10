@@ -5,7 +5,7 @@ PLUGIN.version = "0.1.0"
 PLUGIN.homepage = "https://github.com/maya0513/vfox-moonbit"
 PLUGIN.license = "Apache-2.0"
 PLUGIN.description = "Install the latest stable MoonBit toolchain with its matching core library."
-PLUGIN.minRuntimeVersion = "0.4.0"
+PLUGIN.minRuntimeVersion = "1.0.12"
 PLUGIN.manifestUrl = "https://github.com/maya0513/vfox-moonbit/releases/download/manifest/manifest.json"
 
 -- MoonBit invokes Git for package and project operations. mise uses this

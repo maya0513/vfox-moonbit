@@ -40,13 +40,15 @@ def test_build_is_deterministic_and_complete(tmp_path):
     assert first[1].read_text(encoding="ascii") == f"{digest}  vfox-moonbit-0.1.0.zip\n"
     manifest = json.loads(first[2].read_text(encoding="utf-8"))
     assert manifest["downloadUrl"].endswith("/v0.1.0/vfox-moonbit-0.1.0.zip")
-    assert manifest["minRuntimeVersion"] == "0.4.0"
+    assert manifest["minRuntimeVersion"] == "1.0.12"
 
     with zipfile.ZipFile(first[0]) as archive:
         assert archive.namelist() == sorted(archive.namelist())
         assert "metadata.lua" in archive.namelist()
         assert "hooks/post_install.lua" in archive.namelist()
         assert "lib/sha2.lua" in archive.namelist()
+        assert "lib/moonbit_sha256_portable.lua" in archive.namelist()
+        assert "lib/moonbit_toolchain.lua" in archive.namelist()
         assert "releases/latest.json" not in archive.namelist()
         for info in archive.infolist():
             assert info.date_time == (1980, 1, 1, 0, 0, 0)

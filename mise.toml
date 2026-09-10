@@ -1,4 +1,4 @@
-min_version = "2026.5.12"
+min_version = "2026.9.2"
 
 [settings]
 experimental = true
@@ -9,13 +9,14 @@ PYTHONPATH = "."
 
 [tools]
 actionlint = "1.7.12"
-"conda:gcc" = "16.2.0"
-"conda:lua" = ["5.1.5", "5.4.8"]
-"conda:luarocks" = "3.13.0"
+"conda:gcc" = { version = "16.2.0", os = ["linux"] }
+"conda:lua" = { version = "5.1.5", os = ["linux"] }
+"conda:luarocks" = { version = "3.13.0", os = ["linux"] }
 python = "3.13.15"
+shellcheck = "0.11.0"
 stylua = "2.5.2"
 uv = "0.12.10"
-vfox = ["0.4.0", "1.0.11"]
+vfox = "1.0.12"
 zizmor = "1.30.0"
 
 [tasks.bootstrap]
@@ -32,7 +33,7 @@ run = [
 [tasks.lint]
 description = "Run static analysis and workflow security checks"
 run = [
-  ".rocks/5.4/bin/luacheck metadata.lua hooks lib/moonbit_*.lua tests/lua",
+  ".rocks/5.1/bin/luacheck metadata.lua hooks lib/moonbit_*.lua tests/lua",
   "uv run ruff check scripts tests/python",
   "actionlint .github/workflows/*.yml",
   "zizmor --pedantic .github/workflows",
@@ -40,7 +41,7 @@ run = [
 ]
 
 [tasks."test:unit"]
-description = "Run Lua 5.1, Lua 5.4, and Python unit tests"
+description = "Run Lua 5.1 and Python unit tests"
 run = "bash scripts/test-unit.sh"
 
 [tasks.coverage]

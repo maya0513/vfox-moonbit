@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,35 +13,39 @@ from scripts import e2e
 REPO = Path(__file__).resolve().parents[2]
 
 
-def test_exact_version_and_exec_version_detection(tmp_path):
+def test_exact_version(tmp_path):
     assert e2e.exact_version(REPO).startswith("0.")
-    assert e2e.vfox_supports_exec("vfox version 1.0.0")
-    assert not e2e.vfox_supports_exec("vfox version 0.4.0")
-    assert not e2e.vfox_supports_exec("unknown")
     (tmp_path / "releases").mkdir()
     (tmp_path / "releases" / "latest.json").write_text(json.dumps({"version": "latest"}), encoding="utf-8")
     with pytest.raises(e2e.E2EError, match="supported exact"):
         e2e.exact_version(tmp_path)
 
 
-def test_parse_vfox_environment(tmp_path):
-    root = tmp_path / "install root"
-    (root / "bin").mkdir(parents=True)
-    output = "notice\n" + json.dumps(
-        {
-            "is_hook_env": False,
-            "paths": [str(root / "bin")],
-            "sdks": {"moonbit": {"MOON_HOME": str(root)}},
-        }
-    )
-    assert e2e.parse_vfox_environment(output, root) == (str(root / "bin"), str(root))
+def test_executable_name_uses_the_windows_suffix():
+    assert e2e.executable_name("moon", "posix") == "moon"
+    assert e2e.executable_name("moon", "nt") == "moon.exe"
 
-    with pytest.raises(e2e.E2EError, match="JSON object"):
-        e2e.parse_vfox_environment("not json", root)
-    with pytest.raises(e2e.E2EError, match="unexpected schema"):
-        e2e.parse_vfox_environment("{}", root)
-    with pytest.raises(e2e.E2EError, match="exact PATH"):
-        e2e.parse_vfox_environment(json.dumps({"paths": [], "sdks": {}}), root)
+
+def test_find_vfox_root_normalizes_the_version_container(tmp_path, monkeypatch):
+    version = "0.1.2+abc"
+    container = tmp_path / "vfox" / "cache" / "moonbit-e2e-123" / f"v-{version}"
+    root = container / f"moonbit-{version}"
+    (root / "bin").mkdir(parents=True)
+    executable = "moon.exe" if os.name == "nt" else "moon"
+    (root / "bin" / executable).write_bytes(b"moon")
+
+    monkeypatch.setattr(
+        e2e,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, stdout=str(container) + "\n", stderr=""),
+    )
+    found = e2e.find_vfox_root(
+        "moonbit-e2e-123",
+        version,
+        cwd=tmp_path,
+        env={"VFOX_HOME": str(tmp_path / "vfox")},
+    )
+    assert found == root.resolve()
 
 
 def test_manifest_server_and_prepare_plugin(tmp_path, monkeypatch):
@@ -110,6 +115,9 @@ def test_validate_install_checks_toolchain_core_and_containment(tmp_path):
     (root / "bin" / "internal").mkdir(parents=True)
     for name in e2e.REQUIRED_EXECUTABLES:
         (root / "bin" / name).write_bytes(name.encode())
+    (root / "shims").mkdir()
+    for name in e2e.HELPER_EXECUTABLES:
+        (root / "shims" / name).write_bytes(name.encode())
     (root / "bin" / "internal" / "tcc").write_bytes(b"tcc")
     (root / "bin" / "moonx").symlink_to("moon")
     (root / "lib" / "core" / "builtin").mkdir(parents=True)
@@ -130,7 +138,46 @@ def test_validate_install_checks_toolchain_core_and_containment(tmp_path):
 
 def test_run_reports_success_and_failure(tmp_path):
     env = os.environ.copy()
-    success = e2e.run([os.fspath(Path(os.sys.executable)), "-c", "print('ok')"], cwd=tmp_path, env=env)
+    success = e2e.run(
+        [os.fspath(Path(os.sys.executable)), "-c", "print(input())"],
+        cwd=tmp_path,
+        env=env,
+        input_text="ok\n",
+    )
     assert success.stdout == "ok\n"
     with pytest.raises(e2e.E2EError, match="exited 3"):
         e2e.run([os.fspath(Path(os.sys.executable)), "-c", "raise SystemExit(3)"], cwd=tmp_path, env=env)
+
+
+def test_run_preserves_timeout_output(tmp_path, monkeypatch, capsys):
+    def time_out(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(
+            ["tool", "--flag"],
+            7,
+            output="partial stdout\n",
+            stderr="partial stderr",
+        )
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 7 seconds: tool --flag"):
+        e2e.run(["tool", "--flag"], cwd=tmp_path, env={"PATH": os.environ.get("PATH", "")}, timeout=7)
+    captured = capsys.readouterr()
+    assert captured.out == "$ tool --flag\npartial stdout\n"
+    assert captured.err == "partial stderr\n"
+
+    def time_out_with_bytes(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(["tool"], 5, output=b"byte stdout", stderr=b"byte stderr\n")
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out_with_bytes)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 5 seconds: tool"):
+        e2e.run(["tool"], cwd=tmp_path, env={}, timeout=5)
+    captured = capsys.readouterr()
+    assert captured.out == "$ tool\nbyte stdout\n"
+    assert captured.err == "byte stderr\n"
+
+    def time_out_without_output(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(["tool"], 3)
+
+    monkeypatch.setattr(e2e.subprocess, "run", time_out_without_output)
+    with pytest.raises(e2e.E2EError, match=r"timed out after 3 seconds: tool"):
+        e2e.run(["tool"], cwd=tmp_path, env={}, timeout=3)

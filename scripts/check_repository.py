@@ -40,7 +40,24 @@ def check_owner(repo: Path) -> None:
     )
     if any(value not in config for value in required):
         raise RepositoryError("moonbit_config.lua contains an unresolved or inconsistent repository owner")
-    excluded = {".git", ".venv", ".rocks", ".pytest_cache", ".ruff_cache", "dist", "__pycache__"}
+    excluded = {
+        ".agents",
+        ".codex",
+        ".direnv",
+        ".git",
+        ".mise",
+        ".pytest_cache",
+        ".rocks",
+        ".ruff_cache",
+        ".venv",
+        ".version-fox",
+        ".vfox",
+        "__pycache__",
+        "build",
+        "dist",
+        "htmlcov",
+        "target",
+    }
     text_suffixes = {"", ".json", ".lua", ".md", ".py", ".sh", ".toml", ".yml", ".yaml"}
     candidates = [
         path

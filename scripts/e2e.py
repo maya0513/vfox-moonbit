@@ -23,7 +23,8 @@ from typing import Final
 from scripts import package_plugin
 
 EXACT_VERSION_RE: Final = re.compile(r"^0\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\+[0-9A-Za-z][0-9A-Za-z._-]*$")
-REQUIRED_EXECUTABLES: Final = ("moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp")
+REQUIRED_EXECUTABLES: Final = ("moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp", "moon-ide")
+HELPER_EXECUTABLES: Final = ("moon-lsp", "moon-ide")
 
 
 class E2EError(RuntimeError):
@@ -56,18 +57,33 @@ def run(
     env: dict[str, str],
     timeout: int = 600,
     check: bool = True,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     display = " ".join(str(part) for part in command)
     print(f"$ {display}", flush=True)
-    result = subprocess.run(  # noqa: S603 - commands are fixed by this integration harness.
-        [str(part) for part in command],
-        cwd=cwd,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603 - commands are fixed by this integration harness.
+            [str(part) for part in command],
+            cwd=cwd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            input=input_text,
+        )
+    except subprocess.TimeoutExpired as error:
+        stdout = (
+            error.stdout.decode("utf-8", errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""
+        )
+        stderr = (
+            error.stderr.decode("utf-8", errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""
+        )
+        if stdout:
+            print(stdout, end="" if stdout.endswith("\n") else "\n")
+        if stderr:
+            print(stderr, end="" if stderr.endswith("\n") else "\n", file=sys.stderr)
+        raise E2EError(f"command timed out after {timeout} seconds: {display}") from error
     if result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
     if result.stderr:
@@ -133,15 +149,22 @@ def find_vfox_root(alias: str, version: str, *, cwd: Path, env: dict[str, str]) 
     )
     output = formatted.stdout.strip()
     candidate = Path(output)
+    executable = "moon.exe" if os.name == "nt" else "moon"
+    search_roots: list[Path] = []
     if formatted.returncode == 0 and output and candidate.is_dir():
-        return candidate
+        search_roots.append(candidate)
 
     bases = [Path(env["VFOX_HOME"]), Path.home() / ".version-fox", Path.home() / ".vfox"]
-    executable = "moon.exe" if os.name == "nt" else "moon"
-    matches: list[Path] = []
     for base in bases:
-        if base.is_dir():
-            matches.extend(path.parent.parent for path in base.rglob(executable) if path.parent.name == "bin")
+        for category in ("cache", "sdks"):
+            scoped = base / category / alias
+            if scoped not in search_roots:
+                search_roots.append(scoped)
+
+    matches: list[Path] = []
+    for search_root in search_roots:
+        if search_root.is_dir():
+            matches.extend(path.parent.parent for path in search_root.rglob(executable) if path.parent.name == "bin")
     matching_versions = [path for path in matches if version in path.as_posix()]
     choices = matching_versions or matches
     unique = sorted({path.resolve() for path in choices})
@@ -176,6 +199,13 @@ def validate_install(root: Path, version: str) -> None:
     if os.name != "nt" and (not moonx.is_symlink() or str(moonx.readlink()) != "moon"):
         raise E2EError("moonx must be a relative symlink to moon on Unix")
 
+    shim_suffix = ".cmd" if os.name == "nt" else ""
+    for helper in HELPER_EXECUTABLES:
+        shim = root / "shims" / f"{helper}{shim_suffix}"
+        if not shim.is_file():
+            raise E2EError(f"MoonBit helper shim is missing: {shim}")
+        assert_within(root, shim)
+
     moon_mod = root / "lib" / "core" / "moon.mod"
     if not moon_mod.is_file():
         raise E2EError("installed core has no moon.mod")
@@ -199,29 +229,43 @@ def managed_run(
     return run([*prefix, *command], cwd=cwd, env=env)
 
 
+def executable_name(name: str, os_name: str) -> str:
+    return f"{name}.exe" if os_name == "nt" else name
+
+
 def validate_commands(prefix: Sequence[str], root: Path, version: str, *, workspace: Path, env: dict[str, str]) -> None:
+    moon = executable_name("moon", os.name)
+    moonx = executable_name("moonx", os.name)
+    expected_home = Path(env["MOON_HOME"]).resolve()
     probe = managed_run(
         prefix,
         [
             sys.executable,
             "-c",
-            "import json,os; print(json.dumps({'home': os.environ.get('MOON_HOME'), 'path': os.environ.get('PATH')}))",
+            "import json,os; print(json.dumps({'home': os.environ.get('MOON_HOME'), "
+            "'root': os.environ.get('MOON_TOOLCHAIN_ROOT'), 'path': os.environ.get('PATH')}))",
         ],
         cwd=workspace,
         env=env,
     )
     values = json.loads(probe.stdout.strip().splitlines()[-1])
-    if not isinstance(values.get("home"), str) or Path(values["home"]).resolve() != root.resolve():
-        raise E2EError("manager did not export the exact install root as MOON_HOME")
+    if not isinstance(values.get("home"), str) or Path(values["home"]).resolve() != expected_home:
+        raise E2EError("manager overwrote the caller's mutable MOON_HOME")
+    if not isinstance(values.get("root"), str) or Path(values["root"]).resolve() != root.resolve():
+        raise E2EError("manager did not export the exact install root as MOON_TOOLCHAIN_ROOT")
     if not isinstance(values.get("path"), str):
         raise E2EError("manager did not export PATH")
     path_entries = values["path"].split(os.pathsep)
-    if not path_entries or Path(path_entries[0]).resolve() != (root / "bin").resolve():
-        raise E2EError("manager did not prepend the exact install bin directory to PATH")
+    expected_paths = [(root / "shims").resolve(), (root / "bin").resolve()]
+    path_count = len(expected_paths)
+    if len(path_entries) < path_count or [Path(path).resolve() for path in path_entries[:path_count]] != expected_paths:
+        raise E2EError("manager did not prepend the helper shims and install bin directories in order")
+
+    install_before = tree_fingerprint(root)
 
     version_result = managed_run(
         prefix,
-        ["moon", "version", "--all", "--json", "--no-path"],
+        [moon, "version", "--all", "--json", "--no-path"],
         cwd=workspace,
         env=env,
     )
@@ -235,18 +279,22 @@ def validate_commands(prefix: Sequence[str], root: Path, version: str, *, worksp
     project = workspace / "fixture project"
     managed_run(
         prefix,
-        ["moon", "new", "--user", "vfox-e2e", "--name", "smoke", str(project)],
+        [moon, "new", "--user", "vfox-e2e", "--name", "smoke", str(project)],
         cwd=workspace,
         env=env,
     )
-    managed_run(prefix, ["moon", "check"], cwd=project, env=env)
-    managed_run(prefix, ["moon", "test"], cwd=project, env=env)
-    managed_run(prefix, ["moon", "run", "cmd/main"], cwd=project, env=env)
+    managed_run(prefix, [moon, "check"], cwd=project, env=env)
+    managed_run(prefix, [moon, "test"], cwd=project, env=env)
+    managed_run(prefix, [moon, "run", "cmd/main"], cwd=project, env=env)
     # moonx selects package-runner behaviour from argv[0]; it is not a second
     # spelling of the `moon` CLI, so `moonx version` is intentionally invalid.
-    moonx_help = managed_run(prefix, ["moonx", "--help"], cwd=project, env=env)
+    moonx_help = managed_run(prefix, [moonx, "--help"], cwd=project, env=env)
     if "package" not in (moonx_help.stdout + moonx_help.stderr).lower():
         raise E2EError("moonx did not identify itself as the package runner")
+    managed_run(prefix, [moon, "lsp", "--version"], cwd=project, env=env)
+    managed_run(prefix, [moon, "ide", "--help"], cwd=project, env=env)
+    if tree_fingerprint(root) != install_before:
+        raise E2EError("MoonBit commands modified the managed installation root")
 
 
 def run_mise(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]) -> None:
@@ -268,60 +316,36 @@ def run_mise(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]
     )
 
 
-def vfox_supports_exec(version_output: str) -> bool:
-    match = re.search(r"(?:version\s+)?(\d+)\.(\d+)\.(\d+)", version_output)
-    return bool(match and int(match.group(1)) >= 1)
-
-
-def parse_vfox_environment(output: str, root: Path) -> tuple[str, str]:
-    try:
-        document = json.loads(next(line for line in reversed(output.splitlines()) if line.strip().startswith("{")))
-    except (StopIteration, json.JSONDecodeError) as error:
-        raise E2EError("vfox env --json did not return a JSON object") from error
-    paths = document.get("paths")
-    sdks = document.get("sdks")
-    if not isinstance(paths, list) or not isinstance(sdks, dict):
-        raise E2EError("vfox env --json has an unexpected schema")
-    expected_bin = (root / "bin").resolve()
-    matching_paths = [value for value in paths if isinstance(value, str) and Path(value).resolve() == expected_bin]
-    homes = [
-        variables.get("MOON_HOME")
-        for variables in sdks.values()
-        if isinstance(variables, dict) and isinstance(variables.get("MOON_HOME"), str)
-    ]
-    matching_homes = [value for value in homes if Path(value).resolve() == root.resolve()]
-    if len(matching_paths) != 1 or len(matching_homes) != 1:
-        raise E2EError("standalone vfox did not export the exact PATH and MOON_HOME from EnvKeys")
-    return matching_paths[0], matching_homes[0]
-
-
 def run_vfox(plugin: Path, version: str, *, workspace: Path, env: dict[str, str]) -> None:
     if shutil.which("vfox", path=env.get("PATH")) is None:
         raise E2EError("vfox is not available on PATH")
     distribution = workspace / "plugin distribution"
     archive, _, _ = package_plugin.build(plugin, distribution)
     alias = f"moonbit-e2e-{os.getpid()}"
+    vfox_home = Path(env["VFOX_HOME"])
+    (vfox_home / "plugin").mkdir(parents=True, exist_ok=True)
+    run(["vfox", "--version"], cwd=workspace, env=env)
     added = False
+    primary_failed = False
     try:
         run(["vfox", "add", "--source", archive, alias], cwd=workspace, env=env)
         added = True
-        run(["vfox", "install", "--yes", f"{alias}@latest"], cwd=workspace, env=env)
+        run(["vfox", "install", "--yes", f"{alias}@latest"], cwd=workspace, env=env, timeout=300)
         root = find_vfox_root(alias, version, cwd=workspace, env=env)
         validate_install(root, version)
-        version_output = run(["vfox", "--version"], cwd=workspace, env=env).stdout
-        if vfox_supports_exec(version_output):
-            prefix = ["vfox", "exec", f"{alias}@{version}", "--"]
-        else:
-            run(["vfox", "use", "--session", f"{alias}@{version}"], cwd=workspace, env=env)
-            environment = run(["vfox", "env", "--json"], cwd=workspace, env=env)
-            bin_path, moon_home = parse_vfox_environment(environment.stdout, root)
-            env["MOON_HOME"] = moon_home
-            env["PATH"] = bin_path + os.pathsep + env["PATH"]
-            prefix = []
+        prefix = ["vfox", "exec", f"{alias}@{version}", "--"]
         validate_commands(prefix, root, version, workspace=workspace, env=env)
+    except BaseException:
+        primary_failed = True
+        raise
     finally:
         if added:
-            run(["vfox", "remove", alias], cwd=workspace, env=env, check=False)
+            try:
+                run(["vfox", "remove", "--yes", alias], cwd=workspace, env=env, timeout=30)
+            except (E2EError, OSError, subprocess.SubprocessError) as cleanup_error:
+                if not primary_failed:
+                    raise
+                print(f"warning: vfox cleanup failed after the primary E2E failure: {cleanup_error}", file=sys.stderr)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -361,6 +385,7 @@ def main(argv: list[str] | None = None) -> int:
                     "MISE_STATE_DIR": str(base / "mise state + symbols"),
                     "MISE_NO_UPDATE_CHECK": "1",
                     "VFOX_HOME": str(base / "vfox home + symbols"),
+                    "MOON_HOME": str(base / "moon user state + symbols"),
                 }
             )
             if args.backend in {"mise", "all"}:

@@ -30,10 +30,15 @@ jobs:
       - name: Install pinned development tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
-          version: 2026.9.1
-          install: true
+          version: 2026.9.2
+          install: false
           cache: false
           experimental: true
+
+      - name: Install locked development tools
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mise install --locked
 
       - name: Bootstrap and verify release source
         run: |

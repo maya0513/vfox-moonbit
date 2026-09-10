@@ -1,7 +1,16 @@
 local M = {}
 
+function M.default_module(loader)
+    loader = loader or require
+    local loaded = { pcall(loader, "sha2") }
+    if loaded[1] then
+        return loaded[2]
+    end
+    return loader("moonbit_sha256_portable")
+end
+
 function M.file(path, sha_module, opener, chunk_size)
-    sha_module = sha_module or require("sha2")
+    sha_module = sha_module or M.default_module()
     opener = opener or io.open
     chunk_size = chunk_size or 1024 * 1024
 

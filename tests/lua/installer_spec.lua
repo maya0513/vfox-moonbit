@@ -1,5 +1,6 @@
 local Installer = require("moonbit_installer")
 local Runtime = require("moonbit_runtime")
+local Toolchain = require("moonbit_toolchain")
 local sha2 = require("sha2")
 
 local VERSION = "0.10.11+abc123"
@@ -30,7 +31,7 @@ local function make_toolchain(root, suffix)
     suffix = suffix or ""
     assert(Runtime.execute_succeeded(os.execute("mkdir -p -- " .. Runtime.quote_unix(root .. "/bin/internal"))))
     assert(Runtime.execute_succeeded(os.execute("mkdir -p -- " .. Runtime.quote_unix(root .. "/lib"))))
-    for _, executable in ipairs({ "moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp" }) do
+    for _, executable in ipairs({ "moon", "moonc", "moonfmt", "mooninfo", "moonrun", "moon-lsp", "moon-ide" }) do
         write(root .. "/bin/" .. executable .. suffix, executable)
     end
     write(root .. "/bin/internal/tcc", "tcc")
@@ -116,8 +117,13 @@ describe("MoonBit post-install", function()
         assert.matches("ln %-sfn moon", joined)
         assert.matches("bundle.-%-%-all", joined)
         assert.matches("%-%-target.-wasm%-gc.-%-%-quiet", joined)
-        assert.matches("MOON_HOME=", joined)
+        assert.matches("MOON_TOOLCHAIN_ROOT=", joined)
+        assert.matches("MOON_HOME=.*%.vfox%-moonbit%-bundle%-home", joined)
         assert.matches("PATH=", joined)
+        assert.is_truthy(read(root .. "/shims/moon-lsp"):find("MOON_HOME=", 1, true))
+        assert.is_truthy(read(root .. "/shims/moon-ide"):find("MOON_TOOLCHAIN_ROOT=", 1, true))
+        assert.is_nil(io.open(root .. "/.vfox-moonbit-bundle-home", "rb"))
+        assert.is_nil(joined:match("chmod [^\n]* %-%- "))
     end)
 
     it("is idempotent when the same core already exists", function()
@@ -127,7 +133,7 @@ describe("MoonBit post-install", function()
         write(root .. "/lib/core/moon.mod", 'version = "' .. VERSION .. '"\n')
         local deps = dependencies(root)
         Installer.new(deps):install({ rootPath = root, version = VERSION }, { osType = "Linux", archType = "amd64" })
-        assert.equals(VERSION, Installer.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
+        assert.equals(VERSION, Toolchain.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
     end)
 
     it("replaces a mismatched existing core only after staging a verified one", function()
@@ -137,7 +143,7 @@ describe("MoonBit post-install", function()
         write(root .. "/lib/core/moon.mod", 'version = "0.9.0+old"\n')
         local deps = dependencies(root)
         Installer.new(deps):install({ rootPath = root, version = VERSION }, { osType = "Linux", archType = "amd64" })
-        assert.equals(VERSION, Installer.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
+        assert.equals(VERSION, Toolchain.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
         assert.is_nil(io.open(root .. "/.vfox-moonbit-core-backup/moon.mod", "rb"))
     end)
 
@@ -165,7 +171,7 @@ describe("MoonBit post-install", function()
         assert.equals("dead", coroutine.status(thread))
     end)
 
-    it("normalizes the root-stripping archiver used by standalone vfox 0.4", function()
+    it("normalizes the root-stripping archiver used by standalone vfox", function()
         local root = temp_root()
         make_toolchain(root)
         local deps = dependencies(root, {
@@ -180,7 +186,7 @@ describe("MoonBit post-install", function()
             },
         })
         Installer.new(deps):install({ rootPath = root, version = VERSION }, { osType = "Linux", archType = "amd64" })
-        assert.equals(VERSION, Installer.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
+        assert.equals(VERSION, Toolchain.moon_mod_version(root .. "/lib/core/moon.mod", io.open))
     end)
 
     it("rejects unresolved versions, missing Git, and incomplete toolchains", function()
@@ -210,6 +216,14 @@ describe("MoonBit post-install", function()
         end)
 
         write(root .. "/bin/moonc", "moonc")
+        os.remove(root .. "/bin/moon-ide")
+        deps = dependencies(root)
+        assert.has_error(function()
+            Installer.new(deps)
+                :install({ rootPath = root, version = VERSION }, { osType = "Linux", archType = "amd64" })
+        end)
+
+        write(root .. "/bin/moon-ide", "moon-ide")
         os.remove(root .. "/bin/internal/tcc")
         deps = dependencies(root)
         assert.has_error(function()
@@ -311,6 +325,7 @@ describe("MoonBit post-install", function()
         local root = temp_root()
         make_toolchain(root, ".exe")
         local commands = {}
+        local powershell_scripts = {}
         local windows_runtime = {}
         for key, value in pairs(Runtime) do
             windows_runtime[key] = value
@@ -318,24 +333,42 @@ describe("MoonBit post-install", function()
         windows_runtime.join = function(_, ...)
             return Runtime.join("Linux", ...)
         end
+        windows_runtime.checked_powershell_command = function(script)
+            powershell_scripts[#powershell_scripts + 1] = script
+            return script
+        end
         local deps = dependencies(root, {
             runtime = windows_runtime,
             commands = commands,
+            getenv = function(name)
+                assert.equals("PATH", name)
+                return string.rep("long-parent-path;", 1000)
+            end,
             executor = function(command)
                 commands[#commands + 1] = command
-                if command:match("^mklink") then
+                if command:match("^New%-Item") then
                     return false, "exit", 1
                 end
                 return 0
             end,
         })
         local installer = Installer.new(deps)
-        installer:_make_moonx(root, "windows")
+        installer.toolchain:make_moonx(root, "windows")
         assert.equals(read(root .. "/bin/moon.exe"), read(root .. "/bin/moonx.exe"))
-        installer:_bundle(root, "windows")
+        installer.toolchain:bundle(root, "windows")
         local joined = table.concat(commands, "\n")
-        assert.matches("mklink /H", joined)
-        assert.matches('set "MOON_HOME=', joined)
+        assert.matches("New%-Item %-ItemType HardLink", joined)
+        assert.matches("%$env:MOON_TOOLCHAIN_ROOT =", joined)
+        assert.matches("%$env:MOON_HOME =.*%.vfox%-moonbit%-bundle%-home", joined)
+        assert.matches("%+ %$env:PATH", joined)
+        local bundled = 0
+        for _, script in ipairs(powershell_scripts) do
+            if script:find("$env:MOON_TOOLCHAIN_ROOT", 1, true) then
+                bundled = bundled + 1
+                assert.is_true(#Runtime.checked_powershell_command(script) < 8191)
+            end
+        end
+        assert.equals(2, bundled)
         assert.matches("wasm%-gc", joined)
     end)
 
@@ -349,22 +382,25 @@ describe("MoonBit post-install", function()
         windows_runtime.join = function(_, ...)
             return Runtime.join("Linux", ...)
         end
+        windows_runtime.checked_powershell_command = function(script)
+            return script
+        end
         local deps = dependencies(root, {
             runtime = windows_runtime,
             executor = function(command)
-                if command:match("^mklink") then
+                if command:match("^New%-Item") then
                     write(root .. "/bin/moonx.exe", "tampered")
                 end
                 return 0
             end,
         })
         assert.has_error(function()
-            Installer.new(deps):_make_moonx(root, "windows")
+            Installer.new(deps).toolchain:make_moonx(root, "windows")
         end)
     end)
 
     it("handles copy-file IO failures", function()
-        assert.is_nil(Installer.copy_file("a", "b", function()
+        assert.is_nil(Toolchain.copy_file("a", "b", function()
             return nil, "source missing"
         end))
 
@@ -375,7 +411,7 @@ describe("MoonBit post-install", function()
             end,
         }
         local calls = 0
-        assert.is_nil(Installer.copy_file("a", "b", function()
+        assert.is_nil(Toolchain.copy_file("a", "b", function()
             calls = calls + 1
             if calls == 1 then
                 return input
@@ -406,7 +442,7 @@ describe("MoonBit post-install", function()
             end,
         }
         calls = 0
-        assert.is_nil(Installer.copy_file("a", "b", function()
+        assert.is_nil(Toolchain.copy_file("a", "b", function()
             calls = calls + 1
             return calls == 1 and source or output
         end))
@@ -416,12 +452,12 @@ describe("MoonBit post-install", function()
     it("parses moon.mod strictly and reports unreadable input", function()
         local root = temp_root()
         write(root .. "/moon.mod", 'name = "x"\n  version = "0.1.0+a"  \n')
-        assert.equals("0.1.0+a", Installer.moon_mod_version(root .. "/moon.mod", io.open))
+        assert.equals("0.1.0+a", Toolchain.moon_mod_version(root .. "/moon.mod", io.open))
         write(root .. "/moon.mod", 'name = "x"\n')
-        local version, reason = Installer.moon_mod_version(root .. "/moon.mod", io.open)
+        local version, reason = Toolchain.moon_mod_version(root .. "/moon.mod", io.open)
         assert.is_nil(version)
         assert.matches("top%-level", reason)
-        assert.is_nil(Installer.moon_mod_version(root .. "/missing", io.open))
+        assert.is_nil(Toolchain.moon_mod_version(root .. "/missing", io.open))
     end)
 
     it("restores an old core when the final rename fails", function()
@@ -463,7 +499,7 @@ describe("MoonBit post-install", function()
             end,
         })
         assert.has_error(function()
-            installer:_install_core("/stage", "/dest", "/backup", VERSION, "linux")
+            installer.toolchain:promote_core("/stage", "/dest", "/backup", "linux")
         end)
         assert.equals(3, #rename_calls)
     end)
@@ -496,7 +532,7 @@ describe("MoonBit post-install", function()
             end,
         })
         assert.has_error(function()
-            installer:_install_core("/stage", "/dest", "/backup", VERSION, "linux")
+            installer.toolchain:promote_core("/stage", "/dest", "/backup", "linux")
         end)
     end)
 
@@ -521,7 +557,7 @@ describe("MoonBit post-install", function()
             remove = function() end,
         })
         assert.has_error(function()
-            installer:_make_moonx("/root", "windows")
+            installer.toolchain:make_moonx("/root", "windows")
         end)
     end)
 end)

@@ -24,7 +24,8 @@ mise install
 mise exec -- moon version --all --json --no-path
 ```
 
-初期互換性 floor は mise 2026.5.12 です。
+CI で現在実動作を確認する基準版は mise 2026.9.2 です。これは上限ではなく、以降の
+mise も動作する想定です。開発 tool 更新時に CI の確認版も最新版へ追随させます。
 
 ## standalone vfox で使う
 
@@ -34,11 +35,14 @@ public registry 採用前は Release の ZIP を直接追加します。`0.1.0` 
 ```shell
 vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
 vfox install --yes moonbit@latest
+# Linux / macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
+# Windows + vfox 1.0.12（`exec` のPATH検索では拡張子が必要）
+vfox exec moonbit@latest -- moon.exe version --all --json --no-path
 ```
 
-`vfox exec` は vfox 1.0 以降の機能です。互換性 floor の vfox 0.4.0 では、
-vfox を activate 済みの shell で `vfox use moonbit@latest` を使ってください。
+CI で現在実動作を確認する基準版は vfox 1.0.12 です。これは上限ではなく、以降の
+互換性がある vfox も動作する想定です。
 
 ## インストールの仕組み
 
@@ -51,7 +55,11 @@ MoonBit の toolchain 本体と同時リリースされる `core` 標準ライ�
 - インストール時は exact manifest を再取得し、core を `.part` に保存して hash を
   検証してから展開します。`core/moon.mod` の版も完全一致させ、公式 installer と
   同じ二つの bundle コマンドを実行します。
-- 環境変数は `PATH=<install-root>/bin` と `MOON_HOME=<install-root>` だけです。
+- `PATH` は `<install-root>/shims`、`<install-root>/bin` の順に設定し、不変な
+  toolchain と core は `MOON_TOOLCHAIN_ROOT=<install-root>` で選択します。
+- 可変なユーザー状態の `MOON_HOME` は上書きしません。現行バイナリがcore探索に
+  まだ必要とするため、`moon-lsp` と `moon-ide` の互換shim内だけでinstall rootを
+  `MOON_HOME` に設定します。
 
 MoonBit のバイナリはこのリポジトリで再配布・ミラーしません。過去の exact manifest
 は残しますが、公式 CDN から削除された版の再インストールまでは保証できません。
@@ -73,15 +81,18 @@ macOS Intel、Windows ARM64 emulation、32-bit、musl/Alpine、その他 OS は�
 best-effort で、正式なテスト対象ではありません。
 
 MoonBit が利用する Git は必須です。native target で必要になる platform 固有の
-tool や library はこのプラグインの管理対象外です。
+tool や library はこのプラグインの管理対象外です。Windows のインストール処理は、
+path を安全に扱うため OS 標準の Windows PowerShell（`powershell.exe`）を使います。
 
 ## 認証、状態、IDE
 
-プラグインは `~/.moon`、shell 設定、認証情報に触れません。認証、package index、
-cache は版ごとの `MOON_HOME` に分離されるので、更新後に `moon login` が再度必要に
-なる場合があります。別 toolchain へ認証情報を自動コピーしないための仕様です。
+プラグインのインストーラーは `~/.moon`、shell 設定、認証情報に触れません。認証、
+package index、cache は通常の可変な `MOON_HOME`（未指定時は `~/.moon`）を使うため、
+mise/vfox でtoolchainを更新しても保持されます。利用者が設定済みの `MOON_HOME` も
+上書きしません。
 
-LSP と CLI が同じ toolchain/core を参照するよう、IDE も管理環境から起動します。
+`MOON_TOOLCHAIN_ROOT` とhelper shimによりLSPとCLIが同じtoolchain/coreを参照するよう、
+IDEも管理環境から起動します。
 
 ```shell
 mise exec -- code .
@@ -123,7 +134,7 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` は format、lint、workflow security、Lua 5.1/5.4 unit test、manifest、
+`mise run ci` は format、lint、workflow security、Lua 5.1 unit test、manifest、
 line/branch coverage を検査します。GitHub Actions の実 E2E は全対応ホストで mise と
 standalone vfox の両方を検証します。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。

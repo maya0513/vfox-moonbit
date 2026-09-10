@@ -31,7 +31,7 @@ jobs:
       - name: Install pinned Python
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
-          version: 2026.9.1
+          version: 2026.9.2
           install: true
           install_args: python
           cache: true
@@ -186,7 +186,9 @@ jobs:
             printf 'Latest discovery run: <%s/%s/actions/runs/%s>\n\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf '```text\n'
-            sed 's/```/` ` `/g' "$RUNNER_TEMP/moonbit-updater-output.txt"
+            printf -v fence '\x60\x60\x60'
+            printf -v spaced_fence '\x60 \x60 \x60'
+            sed "s/$fence/$spaced_fence/g" "$RUNNER_TEMP/moonbit-updater-output.txt"
             printf '\n```\n'
           } > upstream/MANUAL_REVIEW.md
           git add upstream/MANUAL_REVIEW.md
