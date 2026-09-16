@@ -155,24 +155,46 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
-          app-id: ${{ secrets.MOONBIT_UPDATER_APP_ID }}
+          client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}
           private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: vfox-moonbit
           permission-contents: write
           permission-pull-requests: write
 
+      - name: Resolve GitHub App bot identity
+        if: steps.discover.outputs.manual_review == 'true' || steps.diff.outputs.changed == 'true'
+        id: app-user
+        shell: bash
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if [[ ! "$APP_SLUG" =~ ^[a-z0-9-]+$ ]]; then
+            echo "GitHub App returned an invalid slug" >&2
+            exit 1
+          fi
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          if [[ ! "$user_id" =~ ^[0-9]+$ ]]; then
+            echo "GitHub App bot user ID is invalid" >&2
+            exit 1
+          fi
+          echo "name=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${user_id}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
       - name: Create or update the manual-review pull request
         if: steps.discover.outputs.manual_review == 'true'
         shell: bash
         env:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_EMAIL: ${{ steps.app-user.outputs.email }}
+          BOT_NAME: ${{ steps.app-user.outputs.name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           branch="automation/moonbit-manual-review"
           remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git config user.name "moonbit-updater[bot]"
-          git config user.email "moonbit-updater[bot]@users.noreply.github.com"
+          git config user.name "$BOT_NAME"
+          git config user.email "$BOT_EMAIL"
           if git fetch "$remote" "refs/heads/$branch:refs/remotes/updater/manual-review"; then
             git switch -C "$branch" refs/remotes/updater/manual-review
           else
@@ -208,13 +230,15 @@ jobs:
         shell: bash
         env:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_EMAIL: ${{ steps.app-user.outputs.email }}
+          BOT_NAME: ${{ steps.app-user.outputs.name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           branch="automation/moonbit-latest"
           version="$(python -c 'import json; print(json.load(open("releases/latest.json", encoding="utf-8"))["version"])')"
           remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git config user.name "moonbit-updater[bot]"
-          git config user.email "moonbit-updater[bot]@users.noreply.github.com"
+          git config user.name "$BOT_NAME"
+          git config user.email "$BOT_EMAIL"
           remote_tip=""
           if git fetch "$remote" "refs/heads/$branch:refs/remotes/updater/latest"; then
             remote_tip="$(git rev-parse refs/remotes/updater/latest)"

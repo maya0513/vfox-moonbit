@@ -37,16 +37,21 @@ Grant exactly:
 - Contents: read and write
 - Pull requests: read and write
 
-Do not grant bypass permissions. Store its values as Actions secrets:
+Do not grant bypass permissions. Store the public Client ID as an Actions
+repository variable:
 
-- `MOONBIT_UPDATER_APP_ID`
+- `MOONBIT_UPDATER_CLIENT_ID`
+
+Store only the private key as an Actions secret:
+
 - `MOONBIT_UPDATER_PRIVATE_KEY`
 
 The update workflow uses this installation token for the bot branch and pull
 request because pull requests authored by the normal `GITHUB_TOKEN` do not
 trigger subsequent workflows. The workflow-scoped `GITHUB_TOKEN`, with Issues
 write only, reports maintenance failures; the App itself does not receive Issue
-permission.
+permission. Commits use the actual App slug and GitHub bot user ID so GitHub
+attributes them to the App rather than to an unverified static identity.
 
 The updater runs every six hours and on manual dispatch. It force-updates only
 `automation/moonbit-latest`, never `main`, keeps one PR, enables squash

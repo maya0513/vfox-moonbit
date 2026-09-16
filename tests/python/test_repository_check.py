@@ -110,6 +110,32 @@ def test_action_pins_and_missing_workflows(tmp_path):
     check_repository.check_actions(tmp_path)
 
 
+def test_updater_workflow_authentication_contract(tmp_path):
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    path = workflows / "update-latest.yml"
+    with pytest.raises(check_repository.RepositoryError, match="workflow is missing"):
+        check_repository.check_updater_workflow(tmp_path)
+
+    original = (REPO / ".github" / "workflows" / "update-latest.yml").read_text(encoding="utf-8")
+    path.write_text(original, encoding="utf-8")
+    check_repository.check_updater_workflow(tmp_path)
+
+    path.write_text(
+        original.replace(
+            "client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}",
+            "app-id: ${{ secrets.MOONBIT_UPDATER_APP_ID }}",
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(check_repository.RepositoryError, match="legacy GitHub App ID"):
+        check_repository.check_updater_workflow(tmp_path)
+
+    path.write_text(original.replace("${APP_SLUG}[bot]", "moonbit-updater[bot]"), encoding="utf-8")
+    with pytest.raises(check_repository.RepositoryError, match="static, unattributed"):
+        check_repository.check_updater_workflow(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("output", "returncode", "expected"),
     [
@@ -129,7 +155,7 @@ def test_origin_slug(monkeypatch, output, returncode, expected):
 
 
 def test_validate_origin_policy(monkeypatch):
-    for name in ("check_owner", "check_release_policy", "check_plugin_code", "check_actions"):
+    for name in ("check_owner", "check_release_policy", "check_plugin_code", "check_actions", "check_updater_workflow"):
         monkeypatch.setattr(check_repository, name, lambda _repo: None)
     monkeypatch.setattr(check_repository, "origin_slug", lambda _repo: None)
     with pytest.raises(check_repository.RepositoryError, match="required"):
