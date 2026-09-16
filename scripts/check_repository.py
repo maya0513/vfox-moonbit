@@ -111,6 +111,26 @@ def check_actions(repo: Path) -> None:
                 raise RepositoryError(f"GitHub Action is not pinned to a full commit SHA in {path.name}: {reference}")
 
 
+def check_updater_workflow(repo: Path) -> None:
+    path = repo / ".github" / "workflows" / "update-latest.yml"
+    if not path.is_file():
+        raise RepositoryError("MoonBit updater workflow is missing")
+    text = path.read_text(encoding="utf-8")
+    if "app-id:" in text or "MOONBIT_UPDATER_APP_ID" in text:
+        raise RepositoryError("MoonBit updater workflow must not use the legacy GitHub App ID input")
+    required = (
+        "client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}",
+        "private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}",
+        "APP_SLUG: ${{ steps.app-token.outputs.app-slug }}",
+        "BOT_NAME: ${{ steps.app-user.outputs.name }}",
+        "BOT_EMAIL: ${{ steps.app-user.outputs.email }}",
+    )
+    if any(value not in text for value in required):
+        raise RepositoryError("MoonBit updater workflow has an incomplete GitHub App identity contract")
+    if "moonbit-updater[bot]" in text:
+        raise RepositoryError("MoonBit updater workflow must not use a static, unattributed bot identity")
+
+
 def origin_slug(repo: Path) -> str | None:
     result = subprocess.run(
         ["git", "config", "--get", "remote.origin.url"],  # noqa: S607 - fixed read-only git invocation.
@@ -131,6 +151,7 @@ def validate(repo: Path, *, require_origin: bool = False) -> None:
     check_release_policy(repo)
     check_plugin_code(repo)
     check_actions(repo)
+    check_updater_workflow(repo)
     slug = origin_slug(repo)
     if require_origin and slug is None:
         raise RepositoryError("git remote origin is required for release validation")
