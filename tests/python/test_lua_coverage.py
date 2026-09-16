@@ -40,5 +40,5 @@ def test_lua_coverage_main_rejects_missing_and_low_files(tmp_path, monkeypatch):
         check_lua_coverage.main()
 
     report.write_text(report_for_expected(94.0), encoding="utf-8")
-    with pytest.raises(SystemExit, match="below 95.00%"):
+    with pytest.raises(SystemExit, match=r"below 95\.00%"):
         check_lua_coverage.main()
