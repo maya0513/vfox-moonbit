@@ -76,6 +76,23 @@ export function environmentValue(env: NodeJS.ProcessEnv, name: string): string |
   return key === undefined ? undefined : env[key];
 }
 
+export function normalizeWindowsPathEnvironment(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  if (platform !== 'win32') return env;
+  // Windows treats PATH names case-insensitively, but Node can receive and
+  // re-spawn differently-cased aliases. Keep one key so mise and its child
+  // process cannot update and read different copies.
+  const pathValue = environmentValue(env, 'PATH');
+  const normalized = { ...env };
+  for (const key of Object.keys(normalized)) {
+    if (key.toUpperCase() === 'PATH') delete normalized[key];
+  }
+  if (pathValue !== undefined) normalized.Path = pathValue;
+  return normalized;
+}
+
 export async function containsAdjacentPathEntries(
   entries: readonly string[],
   expected: readonly string[],
@@ -483,7 +500,7 @@ export async function validateCommands(
     [
       'node',
       '-e',
-      'console.log(JSON.stringify({home:process.env.MOON_HOME,root:process.env.MOON_TOOLCHAIN_ROOT,path:process.env.PATH,runtimeDebug:process.env.VFOX_MOONBIT_RUNTIME_DEBUG}))',
+      'console.log(JSON.stringify({home:process.env.MOON_HOME,root:process.env.MOON_TOOLCHAIN_ROOT,path:process.env.PATH}))',
     ],
     { cwd: options.workspace, env: options.env },
   );
@@ -604,10 +621,6 @@ export async function runMise(
     })
   ).stdout.trim();
   await validateInstall(root, version);
-  await run(['mise', '--no-config', 'bin-paths', `moonbit@${version}`], {
-    cwd: options.workspace,
-    env: options.env,
-  });
   await validateCommands(
     ['mise', '--no-config', 'exec', `moonbit@${version}`, '--'],
     root,
@@ -728,7 +741,7 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
       const workspace = join(temporary, 'workspace with spaces + symbols');
       await mkdir(workspace);
       const plugin = await preparePlugin(repository, temporary, baseUrl);
-      const env: NodeJS.ProcessEnv = {
+      const env = normalizeWindowsPathEnvironment({
         ...process.env,
         MISE_DATA_DIR: join(temporary, 'mise data + symbols'),
         MISE_CACHE_DIR: join(temporary, 'mise cache + symbols'),
@@ -736,7 +749,7 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
         MISE_NO_UPDATE_CHECK: '1',
         VFOX_HOME: join(temporary, 'vfox home + symbols'),
         MOON_HOME: join(temporary, 'moon user state + symbols'),
-      };
+      });
       if (argumentsValue.backend === 'mise' || argumentsValue.backend === 'all') {
         await runMise(plugin, version, { workspace, env: { ...env } });
       }
