@@ -16,12 +16,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   assertWithin,
+  environmentValue,
   E2EError,
   exactVersion,
   executableName,
   HELPER_EXECUTABLES,
   main,
   parseArguments,
+  pathsReferToSameEntry,
   preparePlugin,
   REQUIRED_EXECUTABLES,
   run,
@@ -114,6 +116,16 @@ describe('E2E helper invariants', () => {
     await writeFile(child, 'ok');
     await expect(assertWithin(root, child)).resolves.toBeUndefined();
     await expect(assertWithin(root, join(temporary, 'missing'))).rejects.toThrow('escapes');
+  });
+
+  it('normalizes environment key casing and filesystem aliases', async () => {
+    expect(environmentValue({ Path: 'tool path' }, 'PATH')).toBe('tool path');
+    const root = join(temporary, 'real root');
+    await mkdir(root);
+    const alias = join(temporary, 'root alias');
+    if (process.platform !== 'win32') await symlink(root, alias, 'dir');
+    const candidate = process.platform === 'win32' ? root : alias;
+    await expect(pathsReferToSameEntry(root, candidate)).resolves.toBe(true);
   });
 
   it('validates executable, shim, moonx, and core layout', async () => {

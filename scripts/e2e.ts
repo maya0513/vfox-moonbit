@@ -55,6 +55,27 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function normalizedPath(path: string): string {
+  const normalized = resolve(path);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+export async function pathsReferToSameEntry(left: string, right: string): Promise<boolean> {
+  try {
+    const [resolvedLeft, resolvedRight] = await Promise.all([realpath(left), realpath(right)]);
+    return normalizedPath(resolvedLeft) === normalizedPath(resolvedRight);
+  } catch {
+    return normalizedPath(left) === normalizedPath(right);
+  }
+}
+
+export function environmentValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const exact = env[name];
+  if (exact !== undefined) return exact;
+  const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === name.toUpperCase());
+  return key === undefined ? undefined : env[key];
+}
+
 function printCaptured(text: string, error = false): void {
   if (text === '') return;
   const output = text.endsWith('\n') ? text : `${text}\n`;
@@ -455,10 +476,13 @@ export async function validateCommands(
   if (!isRecord(parsedValues))
     throw new E2EError('manager environment probe did not return an object');
   const values = parsedValues;
-  if (typeof values.home !== 'string' || resolve(values.home) !== expectedHome) {
+  if (
+    typeof values.home !== 'string' ||
+    normalizedPath(values.home) !== normalizedPath(expectedHome)
+  ) {
     throw new E2EError("manager overwrote the caller's mutable MOON_HOME");
   }
-  if (typeof values.root !== 'string' || resolve(values.root) !== resolve(root)) {
+  if (typeof values.root !== 'string' || !(await pathsReferToSameEntry(values.root, root))) {
     throw new E2EError('manager did not export the exact install root as MOON_TOOLCHAIN_ROOT');
   }
   if (typeof values.path !== 'string') throw new E2EError('manager did not export PATH');
@@ -467,7 +491,14 @@ export async function validateCommands(
     .slice(0, 2)
     .map((path) => resolve(path));
   const expectedPaths = [resolve(root, 'shims'), resolve(root, 'bin')];
-  if (pathEntries.length < 2 || pathEntries.some((path, index) => path !== expectedPaths[index])) {
+  const pathOrderMatches =
+    pathEntries.length >= 2 &&
+    (
+      await Promise.all(
+        pathEntries.map((path, index) => pathsReferToSameEntry(path, expectedPaths[index] ?? '')),
+      )
+    ).every(Boolean);
+  if (!pathOrderMatches) {
     throw new E2EError(
       'manager did not prepend the helper shims and install bin directories in order',
     );
@@ -517,8 +548,10 @@ export async function validateCommands(
 
 async function commandAvailable(name: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   const extensions =
-    process.platform === 'win32' ? (env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';') : [''];
-  for (const directory of (env.PATH ?? '').split(delimiter)) {
+    process.platform === 'win32'
+      ? (environmentValue(env, 'PATHEXT') ?? '.EXE;.CMD;.BAT').split(';')
+      : [''];
+  for (const directory of (environmentValue(env, 'PATH') ?? '').split(delimiter)) {
     for (const extension of extensions) {
       try {
         if ((await stat(join(directory, `${name}${extension}`))).isFile()) return true;
