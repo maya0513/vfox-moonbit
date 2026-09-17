@@ -604,6 +604,10 @@ export async function runMise(
     })
   ).stdout.trim();
   await validateInstall(root, version);
+  await run(['mise', '--no-config', 'bin-paths', `moonbit@${version}`], {
+    cwd: options.workspace,
+    env: options.env,
+  });
   await validateCommands(
     ['mise', '--no-config', 'exec', `moonbit@${version}`, '--'],
     root,
