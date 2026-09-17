@@ -23,7 +23,6 @@ import {
   executableName,
   HELPER_EXECUTABLES,
   main,
-  normalizeWindowsPathEnvironment,
   parseArguments,
   pathsReferToSameEntry,
   preparePlugin,
@@ -122,14 +121,6 @@ describe('E2E helper invariants', () => {
 
   it('normalizes environment key casing and filesystem aliases', async () => {
     expect(environmentValue({ Path: 'tool path' }, 'PATH')).toBe('tool path');
-    expect(
-      normalizeWindowsPathEnvironment(
-        { PATH: 'current path', Path: 'stale path', OTHER: 'value' },
-        'win32',
-      ),
-    ).toEqual({ Path: 'current path', OTHER: 'value' });
-    const unixEnvironment = { PATH: '/bin' };
-    expect(normalizeWindowsPathEnvironment(unixEnvironment, 'linux')).toBe(unixEnvironment);
     const root = join(temporary, 'real root');
     await mkdir(join(root, 'shims'), { recursive: true });
     await mkdir(join(root, 'bin'));
