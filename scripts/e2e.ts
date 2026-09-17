@@ -483,7 +483,7 @@ export async function validateCommands(
     [
       'node',
       '-e',
-      'console.log(JSON.stringify({home:process.env.MOON_HOME,root:process.env.MOON_TOOLCHAIN_ROOT,path:process.env.PATH}))',
+      'console.log(JSON.stringify({home:process.env.MOON_HOME,root:process.env.MOON_TOOLCHAIN_ROOT,path:process.env.PATH,runtimeDebug:process.env.VFOX_MOONBIT_RUNTIME_DEBUG}))',
     ],
     { cwd: options.workspace, env: options.env },
   );

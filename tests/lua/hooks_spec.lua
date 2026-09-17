@@ -109,6 +109,7 @@ describe("vfox hooks", function()
             { key = "PATH", value = "C:\\root\\shims" },
             { key = "PATH", value = "C:\\root\\bin" },
             { key = "MOON_TOOLCHAIN_ROOT", value = "C:\\root" },
+            { key = "VFOX_MOONBIT_RUNTIME_DEBUG", value = "table|nil|Windows|true" },
             { key = "MISE_ADD_PATH", value = "C:\\root\\shims;C:\\root\\bin" },
         }, load_hook("hooks/env_keys.lua"):EnvKeys({ path = "C:\\root" }))
     end)
