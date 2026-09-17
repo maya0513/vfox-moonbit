@@ -72,6 +72,9 @@ describe("vfox hooks", function()
             context = function()
                 return "/fallback", "0.1.0+a"
             end,
+            is_mise_vfox_runtime = function()
+                return false
+            end,
         }
         _G.RUNTIME = { osType = "Linux" }
         local plugin = load_hook("hooks/env_keys.lua")
@@ -84,6 +87,30 @@ describe("vfox hooks", function()
         assert.is_nil(direct.MOON_HOME)
         local fallback = plugin:EnvKeys({})
         assert.equals("/fallback", fallback[3].value)
+    end)
+
+    it("adds the mise Windows path adapter without changing standalone PATH entries", function()
+        package.loaded.moonbit_runtime = {
+            get = function(ctx, name)
+                return ctx[name]
+            end,
+            join = function(_, root, leaf)
+                return root .. "\\" .. leaf
+            end,
+            context = function()
+                return "C:\\fallback", "0.1.0+a"
+            end,
+            is_mise_vfox_runtime = function(runtime)
+                return runtime.version == "0.6.0"
+            end,
+        }
+        _G.RUNTIME = { osType = "Windows", version = "0.6.0" }
+        assert.same({
+            { key = "PATH", value = "C:\\root\\shims" },
+            { key = "PATH", value = "C:\\root\\bin" },
+            { key = "MOON_TOOLCHAIN_ROOT", value = "C:\\root" },
+            { key = "MISE_ADD_PATH", value = "C:\\root\\shims;C:\\root\\bin" },
+        }, load_hook("hooks/env_keys.lua"):EnvKeys({ path = "C:\\root" }))
     end)
 
     it("delegates PostInstall to the installer", function()

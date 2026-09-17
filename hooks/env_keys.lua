@@ -6,18 +6,32 @@ function PLUGIN:EnvKeys(ctx)
     end
     local runtime = rawget(_G, "RUNTIME") or {}
     local os_name = Runtime.get(runtime, "osType", "os") or ""
-    return {
+    local shims = Runtime.join(os_name, root, "shims")
+    local bin = Runtime.join(os_name, root, "bin")
+    local result = {
         {
             key = "PATH",
-            value = Runtime.join(os_name, root, "shims"),
+            value = shims,
         },
         {
             key = "PATH",
-            value = Runtime.join(os_name, root, "bin"),
+            value = bin,
         },
         {
             key = "MOON_TOOLCHAIN_ROOT",
             value = root,
         },
     }
+
+    -- mise 2026.9.2's Windows vfox adapter does not surface the traditional
+    -- PATH entries in its child environment. MISE_ADD_PATH is consumed by mise
+    -- before spawning the child and is not returned by standalone vfox.
+    if string.lower(os_name) == "windows" and Runtime.is_mise_vfox_runtime(runtime) then
+        result[#result + 1] = {
+            key = "MISE_ADD_PATH",
+            value = shims .. ";" .. bin,
+        }
+    end
+
+    return result
 end

@@ -43,6 +43,12 @@ standalone vfox はメイン SDK のルートを `ctx.sdkInfo.moonbit.path` で�
 直接渡し、`core/` を保持します。検証済みの `stage/core/moon.mod` または
 `stage/moon.mod` というレイアウトだけを受け付けます。
 
+mise 2026.9.2 の Windows vfox adapter では、通常の `PATH` 応答だけでは install root の
+ディレクトリが child process に現れません。この組み合わせに限り、同じ2ディレクトリを
+mise 専用の `MISE_ADD_PATH` にも渡します。mise はこの補助キーを `PATH` へ統合してから
+削除するため、利用者の環境には残りません。standalone vfox には従来どおり標準の
+`PATH` と `MOON_TOOLCHAIN_ROOT` だけを返します。
+
 Windows では GopherLua の `os.execute` がコマンドを `cmd.exe` 経由で起動するため、
 引用符付きパスを含むコマンド文字列が2回目の解釈で壊れます。このため adapter は、
 ファイル操作、hardlink、bundle の各処理を UTF-16LE/Base64 の PowerShell
