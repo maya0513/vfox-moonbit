@@ -76,6 +76,22 @@ export function environmentValue(env: NodeJS.ProcessEnv, name: string): string |
   return key === undefined ? undefined : env[key];
 }
 
+export async function containsAdjacentPathEntries(
+  entries: readonly string[],
+  expected: readonly string[],
+): Promise<boolean> {
+  if (expected.length === 0) return true;
+  const indexes: number[] = [];
+  for (const expectedPath of expected) {
+    const matches = await Promise.all(
+      entries.map((entry) => pathsReferToSameEntry(entry, expectedPath)),
+    );
+    indexes.push(matches.indexOf(true));
+  }
+  const first = indexes[0] ?? -1;
+  return first >= 0 && indexes.every((index, offset) => index === first + offset);
+}
+
 function printCaptured(text: string, error = false): void {
   if (text === '') return;
   const output = text.endsWith('\n') ? text : `${text}\n`;
@@ -488,19 +504,12 @@ export async function validateCommands(
   if (typeof values.path !== 'string') throw new E2EError('manager did not export PATH');
   const pathEntries = values.path
     .split(delimiter)
-    .slice(0, 2)
+    .filter((path) => path !== '')
     .map((path) => resolve(path));
   const expectedPaths = [resolve(root, 'shims'), resolve(root, 'bin')];
-  const pathOrderMatches =
-    pathEntries.length >= 2 &&
-    (
-      await Promise.all(
-        pathEntries.map((path, index) => pathsReferToSameEntry(path, expectedPaths[index] ?? '')),
-      )
-    ).every(Boolean);
-  if (!pathOrderMatches) {
+  if (!(await containsAdjacentPathEntries(pathEntries, expectedPaths))) {
     throw new E2EError(
-      'manager did not prepend the helper shims and install bin directories in order',
+      'manager did not expose the helper shims and install bin directories in order',
     );
   }
 

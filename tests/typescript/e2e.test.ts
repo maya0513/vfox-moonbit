@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   assertWithin,
+  containsAdjacentPathEntries,
   environmentValue,
   E2EError,
   exactVersion,
@@ -121,11 +122,24 @@ describe('E2E helper invariants', () => {
   it('normalizes environment key casing and filesystem aliases', async () => {
     expect(environmentValue({ Path: 'tool path' }, 'PATH')).toBe('tool path');
     const root = join(temporary, 'real root');
-    await mkdir(root);
+    await mkdir(join(root, 'shims'), { recursive: true });
+    await mkdir(join(root, 'bin'));
     const alias = join(temporary, 'root alias');
     if (process.platform !== 'win32') await symlink(root, alias, 'dir');
     const candidate = process.platform === 'win32' ? root : alias;
     await expect(pathsReferToSameEntry(root, candidate)).resolves.toBe(true);
+    await expect(
+      containsAdjacentPathEntries(
+        [temporary, join(candidate, 'shims'), join(candidate, 'bin')],
+        [join(root, 'shims'), join(root, 'bin')],
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      containsAdjacentPathEntries(
+        [join(candidate, 'bin'), join(candidate, 'shims')],
+        [join(root, 'shims'), join(root, 'bin')],
+      ),
+    ).resolves.toBe(false);
   });
 
   it('validates executable, shim, moonx, and core layout', async () => {
