@@ -53,7 +53,7 @@ describe("MoonBit runtime adapter", function()
     end)
 
     it("identifies mise's embedded vfox compatibility runtime", function()
-        assert.is_true(Runtime.is_mise_vfox_runtime({ version = "0.6.0" }))
+        assert.is_true(Runtime.is_mise_vfox_runtime(io.stdout))
         assert.is_false(Runtime.is_mise_vfox_runtime({ version = "1.0.12" }))
         assert.is_false(Runtime.is_mise_vfox_runtime({}))
     end)

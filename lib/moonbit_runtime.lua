@@ -32,12 +32,12 @@ function M.get(object, ...)
     return nil
 end
 
--- mise's embedded Rust vfox compatibility runtime identifies itself as 0.6.0,
--- while standalone vfox reports its own release version. Keep host-specific
+-- mise's embedded Rust runtime exposes RUNTIME as Lua userdata, while
+-- standalone vfox 1.0.12 exposes a regular Lua table. Keep host-specific
 -- compatibility decisions in this adapter instead of spreading them through
 -- hook implementations.
 function M.is_mise_vfox_runtime(runtime)
-    return M.get(runtime, "version") == "0.6.0"
+    return type(runtime) == "userdata"
 end
 
 function M.execute_succeeded(first, _, third)

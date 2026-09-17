@@ -100,11 +100,11 @@ describe("vfox hooks", function()
             context = function()
                 return "C:\\fallback", "0.1.0+a"
             end,
-            is_mise_vfox_runtime = function(runtime)
-                return runtime.version == "0.6.0"
+            is_mise_vfox_runtime = function()
+                return true
             end,
         }
-        _G.RUNTIME = { osType = "Windows", version = "0.6.0" }
+        _G.RUNTIME = { osType = "Windows" }
         assert.same({
             { key = "PATH", value = "C:\\root\\shims" },
             { key = "PATH", value = "C:\\root\\bin" },
