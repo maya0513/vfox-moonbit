@@ -125,7 +125,9 @@ vfox config cache.availableHookDuration 12h
 
 ## 開発
 
-開発 tool は `mise.toml`、`mise.lock`、`uv.lock`、`lua-rocks.lock` に固定します。
+開発 tool は `mise.toml`、`mise.lock`、`package.json`、`pnpm-lock.yaml`、
+`lua-rocks.lock` に固定します。保守 CLI と test は Node.js 24 上の native TypeScript
+として Vite+ 経由で実行し、生成 JavaScript は管理しません。
 
 ```shell
 mise install
@@ -134,8 +136,9 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` は format、lint、workflow security、Lua 5.1 unit test、manifest、
-line/branch coverage を検査します。GitHub Actions の実 E2E は全対応ホストで mise と
+`mise run ci` は format、lint、型、workflow security、Lua 5.1 と TypeScript の unit
+test、manifest、line/branch/function/statement coverage を検査します。GitHub Actions
+の実 E2E は全対応ホストで mise と
 standalone vfox の両方を検証します。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
 

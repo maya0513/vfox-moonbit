@@ -1,0 +1,8 @@
+packages:
+  - '.'
+
+storeDir: .pnpm-store
+
+overrides:
+  'vite@*': 'npm:@voidzero-dev/vite-plus-core@0.3.2'
+  'vitest@*': '4.1.11'

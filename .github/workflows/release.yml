@@ -44,13 +44,13 @@ jobs:
         run: |
           mise run bootstrap
           mise run ci
-          python scripts/check_repository.py --require-origin
+          pnpm exec vp exec node scripts/check_repository.ts --require-origin
 
       - name: Build deterministic release assets
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          python scripts/package_plugin.py --version "$version" --output dist
+          pnpm exec vp exec node scripts/package_plugin.ts --version "$version" --output dist
 
       - name: Attest the plugin ZIP
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4

@@ -1,0 +1,20 @@
+{
+  "name": "vfox-moonbit-maintenance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "@types/yauzl": "3.4.0",
+    "@types/yazl": "3.3.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "tar": "7.5.22",
+    "vite-plus": "0.3.2",
+    "yauzl": "3.4.0",
+    "yazl": "3.3.1"
+  },
+  "engines": {
+    "node": "24.21.0"
+  },
+  "packageManager": "pnpm@12.4.2"
+}

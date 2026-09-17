@@ -48,13 +48,25 @@ jobs:
         with:
           version: 2026.9.2
           install: false
-          cache: true
+          cache: false
           experimental: true
 
       - name: Install locked development tools
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: mise install --locked
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Bootstrap locked test dependencies
         run: mise run bootstrap
@@ -105,15 +117,30 @@ jobs:
           cache: false
           experimental: true
 
-      - name: Install pinned E2E Python
+      - name: Install pinned E2E Node toolchain
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: mise install python@3.13.15
+        run: mise install --locked node@24.21.0 pnpm@12.4.2
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install locked TypeScript dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Run real-download E2E through mise
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: mise exec python@3.13.15 -- python scripts/e2e.py --backend mise
+        run: pnpm exec vp exec node scripts/e2e.ts --backend mise
 
   vfox_e2e:
     name: vfox-e2e (${{ matrix.os }}, vfox 1.0.12)
@@ -140,15 +167,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
-        run: mise install python@3.13.15 vfox@1.0.12
+        run: mise install --locked node@24.21.0 pnpm@12.4.2 vfox@1.0.12
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install locked TypeScript dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
 
       - name: Run real-download E2E through standalone vfox
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: >-
-          mise exec python@3.13.15 vfox@1.0.12 --
-          python scripts/e2e.py --backend vfox --allow-vfox-user-state
+          mise exec node@24.21.0 pnpm@12.4.2 vfox@1.0.12 --
+          pnpm exec vp exec node scripts/e2e.ts --backend vfox --allow-vfox-user-state
 
   required:
     name: required

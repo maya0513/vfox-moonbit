@@ -28,20 +28,36 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install pinned Python
+      - name: Install pinned Node toolchain
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           version: 2026.9.2
           install: true
-          install_args: python
-          cache: true
+          install_args: node pnpm
+          cache: false
+          experimental: true
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install locked TypeScript dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Discover a complete upstream release
         id: discover
         shell: bash
         run: |
           set +e
-          output="$(python scripts/update_latest.py 2>&1)"
+          output="$(pnpm exec vp exec node scripts/update_latest.ts 2>&1)"
           exit_code=$?
           set -e
           printf '%s\n' "$output"
@@ -235,7 +251,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           branch="automation/moonbit-latest"
-          version="$(python -c 'import json; print(json.load(open("releases/latest.json", encoding="utf-8"))["version"])')"
+          version="$(node -p "JSON.parse(require('node:fs').readFileSync('releases/latest.json', 'utf8')).version")"
           remote="https://x-access-token:${APP_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name "$BOT_NAME"
           git config user.email "$BOT_EMAIL"
