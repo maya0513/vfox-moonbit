@@ -4,61 +4,55 @@ min_version = "2026.9.2"
 experimental = true
 lockfile = true
 
-[env]
-PYTHONPATH = "."
-
 [tools]
 actionlint = "1.7.12"
 "conda:gcc" = { version = "16.2.0", os = ["linux"] }
 "conda:lua" = { version = "5.1.5", os = ["linux"] }
 "conda:luarocks" = { version = "3.13.0", os = ["linux"] }
-python = "3.13.15"
+node = "24.21.0"
+pnpm = "12.4.2"
 shellcheck = "0.11.0"
 stylua = "2.5.2"
-uv = "0.12.10"
 vfox = "1.0.12"
 zizmor = "1.30.0"
 
 [tasks.bootstrap]
-description = "Install locked Python and Lua test dependencies"
+description = "Install locked Node and Lua test dependencies"
 run = "bash scripts/bootstrap.sh"
 
 [tasks."fmt:check"]
-description = "Check Lua and Python formatting"
-run = [
-  "stylua --check metadata.lua hooks lib/moonbit_*.lua tests/lua",
-  "uv run ruff format --check scripts tests/python",
-]
+description = "Check Lua and TypeScript formatting"
+run = ["stylua --check metadata.lua hooks lib/moonbit_*.lua tests/lua", "pnpm exec vp fmt --check"]
 
 [tasks.lint]
 description = "Run static analysis and workflow security checks"
 run = [
   ".rocks/5.1/bin/luacheck metadata.lua hooks lib/moonbit_*.lua tests/lua",
-  "uv run ruff check scripts tests/python",
+  "pnpm exec vp check",
   "actionlint .github/workflows/*.yml",
   "zizmor --pedantic .github/workflows",
-  "python scripts/check_repository.py",
+  "pnpm exec vp exec node scripts/check_repository.ts",
 ]
 
 [tasks."test:unit"]
-description = "Run Lua 5.1 and Python unit tests"
+description = "Run Lua 5.1 and TypeScript unit tests"
 run = "bash scripts/test-unit.sh"
 
 [tasks.coverage]
-description = "Enforce first-party Lua and Python coverage at 95%"
+description = "Enforce first-party Lua and TypeScript coverage at 95%"
 run = "bash scripts/coverage.sh"
 
 [tasks.e2e]
 description = "Run the real-download MoonBit integration test through mise"
-run = "python scripts/e2e.py --backend mise"
+run = "pnpm exec vp exec node scripts/e2e.ts --backend mise"
 
 [tasks.package]
 description = "Build a deterministic local plugin release bundle"
-run = "python scripts/package_plugin.py"
+run = "pnpm exec vp exec node scripts/package_plugin.ts"
 
 [tasks."update:check"]
 description = "Validate immutable release manifests and vendored source"
-run = "python scripts/update_latest.py --check"
+run = "pnpm exec vp exec node scripts/update_latest.ts --check"
 
 [tasks.ci]
 description = "Run the same deterministic checks as GitHub Actions"

@@ -2,7 +2,7 @@
 
 ## Local checks
 
-Install the pinned toolset with mise, then bootstrap locked Python and Lua test
+Install the pinned toolset with mise, then bootstrap locked TypeScript and Lua test
 dependencies:
 
 ```shell
@@ -21,7 +21,7 @@ writes its own manager state under the current user's home, so that backend is
 run by GitHub-hosted ephemeral workers. To opt in locally, run:
 
 ```shell
-python scripts/e2e.py --backend vfox --allow-vfox-user-state
+pnpm exec vp exec node scripts/e2e.ts --backend vfox --allow-vfox-user-state
 ```
 
 The tests set an isolated mutable `MOON_HOME` and assert that the real
@@ -31,7 +31,7 @@ The tests set an isolated mutable `MOON_HOME` and assert that the real
 
 Do not edit an existing `releases/<exact-version>.json`. Run
 `mise run update:check` for an offline validation or
-`python scripts/update_latest.py --dry-run` for a networked discovery without
+`pnpm exec vp exec node scripts/update_latest.ts --dry-run` for a networked discovery without
 writes. The scheduled workflow is the normal path for updates.
 
 If the installer recipe, archive layout, version schema, or major version

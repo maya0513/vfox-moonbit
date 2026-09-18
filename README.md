@@ -138,8 +138,10 @@ vfox config cache.availableHookDuration 12h
 
 ## Development
 
-All developer tools are pinned by `mise.toml`, `mise.lock`, `uv.lock`, and
-`lua-rocks.lock`:
+Developer tools are pinned by `mise.toml`, `mise.lock`, `package.json`,
+`pnpm-lock.yaml`, and `lua-rocks.lock`. The maintenance CLIs and tests run as
+native TypeScript on Node.js 24 through Vite+; no generated JavaScript is
+checked in:
 
 ```shell
 mise install
@@ -148,8 +150,9 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` checks formatting, lint, workflow security, Lua 5.1 unit tests,
-manifest invariants, and line/branch coverage. CI runs real downloads and
+`mise run ci` checks formatting, lint, type safety, workflow security, Lua 5.1
+and TypeScript unit tests, manifest invariants, and line/branch/function/
+statement coverage. CI runs real downloads and
 MoonBit fixture projects on every supported host through both mise and
 standalone vfox. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

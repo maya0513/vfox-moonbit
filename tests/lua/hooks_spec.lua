@@ -86,6 +86,26 @@ describe("vfox hooks", function()
         assert.equals("/fallback", fallback[3].value)
     end)
 
+    it("uses native Windows separators for exported paths", function()
+        package.loaded.moonbit_runtime = {
+            get = function(ctx, name)
+                return ctx[name]
+            end,
+            join = function(_, root, leaf)
+                return root .. "\\" .. leaf
+            end,
+            context = function()
+                return "C:\\fallback", "0.1.0+a"
+            end,
+        }
+        _G.RUNTIME = { osType = "Windows" }
+        assert.same({
+            { key = "PATH", value = "C:\\root\\shims" },
+            { key = "PATH", value = "C:\\root\\bin" },
+            { key = "MOON_TOOLCHAIN_ROOT", value = "C:\\root" },
+        }, load_hook("hooks/env_keys.lua"):EnvKeys({ path = "C:\\root" }))
+    end)
+
     it("delegates PostInstall to the installer", function()
         local received
         package.loaded.moonbit_installer = {

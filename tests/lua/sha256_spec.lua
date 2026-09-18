@@ -9,11 +9,16 @@ describe("vendored pure Lua SHA-256", function()
         local feed = sha2.sha256()
         feed("a")("b")("c")
         assert.equals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", feed())
-        assert.equals(
-            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
-            sha2.sha256(string.rep("a", 1000000))
-        )
     end)
+
+    if os.getenv("MOONBIT_COVERAGE") ~= "1" then
+        it("matches the million-byte NIST vector outside line-tracing runs", function()
+            assert.equals(
+                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+                sha2.sha256(string.rep("a", 1000000))
+            )
+        end)
+    end
 
     it("uses the vendored module when the runtime can load it", function()
         local calls = {}

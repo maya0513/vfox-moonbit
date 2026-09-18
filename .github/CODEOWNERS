@@ -1,4 +1,5 @@
 /metadata.lua @maya0513
+/.gitattributes @maya0513
 /.github/CODEOWNERS @maya0513
 /hooks/ @maya0513
 /lib/ @maya0513
@@ -10,5 +11,8 @@
 /mise.toml @maya0513
 /mise.lock @maya0513
 /lua-rocks.lock @maya0513
-/pyproject.toml @maya0513
-/uv.lock @maya0513
+/package.json @maya0513
+/pnpm-lock.yaml @maya0513
+/pnpm-workspace.yaml @maya0513
+/tsconfig.json @maya0513
+/vite.config.ts @maya0513

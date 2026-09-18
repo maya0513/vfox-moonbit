@@ -6,14 +6,16 @@ function PLUGIN:EnvKeys(ctx)
     end
     local runtime = rawget(_G, "RUNTIME") or {}
     local os_name = Runtime.get(runtime, "osType", "os") or ""
+    local shims = Runtime.join(os_name, root, "shims")
+    local bin = Runtime.join(os_name, root, "bin")
     return {
         {
             key = "PATH",
-            value = Runtime.join(os_name, root, "shims"),
+            value = shims,
         },
         {
             key = "PATH",
-            value = Runtime.join(os_name, root, "bin"),
+            value = bin,
         },
         {
             key = "MOON_TOOLCHAIN_ROOT",

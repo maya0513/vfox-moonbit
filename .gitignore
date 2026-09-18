@@ -25,7 +25,11 @@
 /.codex/
 /.agents/
 
-# Python, Lua, and test state
+# Node, Python, Lua, and test state
+/node_modules/
+/.pnpm-store/
+/coverage/
+*.tsbuildinfo
 /.coverage
 /.coverage.*
 /.lua/
