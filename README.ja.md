@@ -29,11 +29,11 @@ mise も動作する想定です。開発 tool 更新時に CI の確認版も�
 
 ## standalone vfox で使う
 
-public registry 採用前は Release の ZIP を直接追加します。`0.1.0` は現在の
+public registry 採用前は Release の ZIP を直接追加します。`0.1.1` は現在の
 プラグイン版へ置き換えてください。
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.1/vfox-moonbit-0.1.1.zip moonbit
 vfox install --yes moonbit@latest
 # Linux / macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
