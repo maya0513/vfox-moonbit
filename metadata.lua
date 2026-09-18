@@ -1,7 +1,7 @@
 PLUGIN = {}
 
 PLUGIN.name = "moonbit"
-PLUGIN.version = "0.1.1"
+PLUGIN.version = "0.1.2"
 PLUGIN.homepage = "https://github.com/maya0513/vfox-moonbit"
 PLUGIN.license = "Apache-2.0"
 PLUGIN.description = "Install the latest stable MoonBit toolchain with its matching core library."
