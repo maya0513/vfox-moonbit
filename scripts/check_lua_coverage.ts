@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 /** Enforce the aggregate and per-file LuaCov line-coverage threshold. */
 
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFile, readdir } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { compareText, errorMessage, isMain } from './lib/common.ts';
 
 const ROW = /^((?:hooks|lib)\/\S+\.lua|metadata\.lua)\s+(\d+)\s+(\d+)\s+([\d.]+)%$/;
-export const EXPECTED = new Set([
-  'hooks/available.lua',
-  'hooks/env_keys.lua',
-  'hooks/post_install.lua',
-  'hooks/pre_install.lua',
-  'lib/moonbit_config.lua',
-  'lib/moonbit_installer.lua',
-  'lib/moonbit_manifest.lua',
-  'lib/moonbit_runtime.lua',
-  'lib/moonbit_sha256.lua',
-  'lib/moonbit_sha256_portable.lua',
-  'lib/moonbit_toolchain.lua',
-]);
+const DEFAULT_REPOSITORY = resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+export async function expectedFiles(repository: string): Promise<Set<string>> {
+  const [hooks, libraries] = await Promise.all([
+    readdir(join(repository, 'hooks')),
+    readdir(join(repository, 'lib')),
+  ]);
+  return new Set([
+    ...hooks.filter((name) => name.endsWith('.lua')).map((name) => `hooks/${name}`),
+    ...libraries.filter((name) => /^moonbit_.*\.lua$/.test(name)).map((name) => `lib/${name}`),
+  ]);
+}
 
 export function parseReport(report: string): Map<string, number> {
   const results = new Map<string, number>();
@@ -32,11 +33,13 @@ export function parseReport(report: string): Map<string, number> {
 export interface CoverageArguments {
   minimum: number;
   report: string;
+  repository: string;
 }
 
 export function parseArguments(argv: readonly string[]): CoverageArguments {
   let minimum = 95;
   let report = resolve('luacov.report.out');
+  let repository = DEFAULT_REPOSITORY;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = argv[index + 1];
@@ -48,6 +51,10 @@ export function parseArguments(argv: readonly string[]): CoverageArguments {
       if (value === undefined) throw new Error('--report requires a value');
       report = resolve(value);
       index += 1;
+    } else if (argument === '--repo') {
+      if (value === undefined) throw new Error('--repo requires a value');
+      repository = resolve(value);
+      index += 1;
     } else {
       throw new Error(`unknown argument: ${argument}`);
     }
@@ -55,16 +62,13 @@ export function parseArguments(argv: readonly string[]): CoverageArguments {
   if (!Number.isFinite(minimum) || minimum < 0 || minimum > 100) {
     throw new Error(`invalid coverage minimum: ${minimum}`);
   }
-  return { minimum, report };
-}
-
-function compareText(left: string, right: string): number {
-  return Buffer.compare(Buffer.from(left), Buffer.from(right));
+  return { minimum, report, repository };
 }
 
 export async function checkCoverage(argumentsValue: CoverageArguments): Promise<string> {
   const rows = parseReport(await readFile(argumentsValue.report, 'utf8'));
-  const missing = [...EXPECTED].filter((name) => !rows.has(name)).toSorted(compareText);
+  const expected = await expectedFiles(argumentsValue.repository);
+  const missing = [...expected].filter((name) => !rows.has(name)).toSorted(compareText);
   if (missing.length > 0) {
     throw new Error(`LuaCov report is missing first-party files: ${missing.join(', ')}`);
   }
@@ -86,16 +90,11 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
     console.log(await checkCoverage(parseArguments(argv)));
     return 0;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(errorMessage(error));
     return 1;
   }
 }
 
 /* v8 ignore start -- the process entrypoint is exercised by mise and Actions */
-function isMain(): boolean {
-  const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(resolve(entrypoint)).href;
-}
-
-if (isMain()) process.exitCode = await main();
+if (isMain(import.meta.url)) process.exitCode = await main();
 /* v8 ignore stop */

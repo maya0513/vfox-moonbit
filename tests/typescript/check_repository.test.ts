@@ -100,6 +100,7 @@ async function makeMaintenanceConfiguration(root: string): Promise<void> {
     'pnpm-workspace.yaml',
     'tsconfig.json',
     'vite.config.ts',
+    'vite.tasks.ts',
   ]) {
     await copyFile(join(REPOSITORY, name), join(root, name));
   }
@@ -219,13 +220,16 @@ describe('Node maintenance tooling policy', () => {
     await makeWorkflow(
       temporary,
       'ci.yml',
-      `steps:\n  - uses: actions/checkout@${'a'.repeat(40)}\n`,
+      `steps:\n  - uses: actions/cache/restore@${'a'.repeat(40)}\n    with:\n      path: node_modules/.vite/task-cache\n  - uses: actions/cache/save@${'b'.repeat(40)}\n`,
     );
     await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
     await writeFile(join(temporary, 'tool.py'), 'print(1)');
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Python maintenance files');
     await rm(join(temporary, 'tool.py'));
-    await writeFile(join(temporary, '.github', 'workflows', 'ci.yml'), 'run: python tool.py\n');
+    await writeFile(
+      join(temporary, '.github', 'workflows', 'ci.yml'),
+      'uses: actions/cache/restore@ref\nuses: actions/cache/save@ref\npath: node_modules/.vite/task-cache\nrun: python tool.py\n',
+    );
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('forbidden Python tooling');
   });
 

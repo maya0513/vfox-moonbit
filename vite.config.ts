@@ -1,6 +1,15 @@
 import { defineConfig } from 'vite-plus';
 
+import { tasks } from './vite.tasks.ts';
+
 export default defineConfig({
+  run: {
+    cache: {
+      scripts: false,
+      tasks: true,
+    },
+    tasks,
+  },
   lint: {
     ignorePatterns: ['coverage/**', 'dist/**', 'lib/sha2.lua'],
     options: {
@@ -19,7 +28,7 @@ export default defineConfig({
     },
     overrides: [
       {
-        files: ['scripts/**/*.ts', 'tests/typescript/**/*.ts', 'vite.config.ts'],
+        files: ['scripts/**/*.ts', 'tests/typescript/**/*.ts', 'vite.config.ts', 'vite.tasks.ts'],
         env: { node: true },
       },
       {
@@ -46,7 +55,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/typescript/**/*.test.ts'],
     coverage: {
-      exclude: ['scripts/e2e.ts'],
+      exclude: ['scripts/e2e.ts', 'scripts/e2e/**'],
       include: ['scripts/**/*.ts'],
       provider: 'v8',
       reporter: ['text', 'json-summary'],

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   checkCoverage,
-  EXPECTED,
+  expectedFiles,
   main,
   parseArguments,
   parseReport,
@@ -16,6 +16,14 @@ let temporary: string;
 
 beforeEach(async () => {
   temporary = await mkdtemp(join(tmpdir(), 'lua-coverage-test-'));
+  await mkdir(join(temporary, 'hooks'));
+  await mkdir(join(temporary, 'lib'));
+  await Promise.all([
+    writeFile(join(temporary, 'metadata.lua'), 'PLUGIN = {}\n'),
+    writeFile(join(temporary, 'hooks', 'available.lua'), 'return {}\n'),
+    writeFile(join(temporary, 'lib', 'moonbit_runtime.lua'), 'return {}\n'),
+    writeFile(join(temporary, 'lib', 'sha2.lua'), 'return {}\n'),
+  ]);
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -25,8 +33,8 @@ afterEach(async () => {
   await rm(temporary, { force: true, recursive: true });
 });
 
-function completeReport(coverage = 100): string {
-  return [...EXPECTED]
+async function completeReport(coverage = 100): Promise<string> {
+  return [...(await expectedFiles(temporary))]
     .toSorted()
     .map((name) => `${name} 10 0 ${coverage.toFixed(2)}%`)
     .join('\n');
@@ -49,12 +57,18 @@ Total                         109      5   95.61%
 
   it('accepts complete reports and rejects missing or low files', async () => {
     const report = join(temporary, 'report.out');
-    await writeFile(report, completeReport());
-    await expect(checkCoverage({ minimum: 95, report })).resolves.toContain('Lua line coverage');
+    await writeFile(report, await completeReport());
+    await expect(checkCoverage({ minimum: 95, report, repository: temporary })).resolves.toContain(
+      'Lua line coverage',
+    );
     await writeFile(report, 'hooks/available.lua 10 0 100.00%\n');
-    await expect(checkCoverage({ minimum: 95, report })).rejects.toThrow('missing first-party');
-    await writeFile(report, completeReport(94));
-    await expect(checkCoverage({ minimum: 95, report })).rejects.toThrow('below 95.00%');
+    await expect(checkCoverage({ minimum: 95, report, repository: temporary })).rejects.toThrow(
+      'missing first-party',
+    );
+    await writeFile(report, await completeReport(94));
+    await expect(checkCoverage({ minimum: 95, report, repository: temporary })).rejects.toThrow(
+      'below 95.00%',
+    );
   });
 
   it('parses strict CLI arguments', () => {
@@ -65,13 +79,16 @@ Total                         109      5   95.61%
     expect(() => parseArguments(['--minimum', 'bad'])).toThrow('invalid coverage minimum');
     expect(() => parseArguments(['--minimum', '101'])).toThrow('invalid coverage minimum');
     expect(() => parseArguments(['--report'])).toThrow('requires a value');
+    expect(() => parseArguments(['--repo'])).toThrow('requires a value');
     expect(() => parseArguments(['--unknown'])).toThrow('unknown argument');
   });
 
   it('returns CLI-compatible success and failure codes', async () => {
     const report = join(temporary, 'report.out');
-    await writeFile(report, completeReport());
-    await expect(main(['--report', report])).resolves.toBe(0);
-    await expect(main(['--report', join(temporary, 'missing')])).resolves.toBe(1);
+    await writeFile(report, await completeReport());
+    await expect(main(['--report', report, '--repo', temporary])).resolves.toBe(0);
+    await expect(main(['--report', join(temporary, 'missing'), '--repo', temporary])).resolves.toBe(
+      1,
+    );
   });
 });

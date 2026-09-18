@@ -4,12 +4,14 @@
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve, relative, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { ZipFile } from 'yazl';
 
-export const OWNER = 'maya0513';
-export const REPOSITORY = 'vfox-moonbit';
+import { canonicalJson, compareText, errorMessage, isMain } from './lib/common.ts';
+import { OWNER, REPOSITORY } from './lib/project.ts';
+
+export { canonicalJson, OWNER, REPOSITORY };
 export const SEMVER_RE = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const STRING_FIELD_RE = /^PLUGIN\.([A-Za-z][A-Za-z0-9]*)\s*=\s*"([^"\r\n]*)"\s*$/;
 const LIST_FIELD_RE = /^PLUGIN\.(depends|notes|legacyFilenames)\s*=\s*\{(.*?)\}/gms;
@@ -40,30 +42,6 @@ const ZIP_TIME = new Date(1980, 0, 1, 0, 0, 0);
 export type Metadata = Record<string, string | string[]>;
 
 export class PackageError extends Error {}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function compareText(left: string, right: string): number {
-  return Buffer.compare(Buffer.from(left), Buffer.from(right));
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .toSorted(([left], [right]) => compareText(left, right))
-        .map(([key, child]) => [key, sortJson(child)]),
-    );
-  }
-  return value;
-}
-
-export function canonicalJson(document: unknown): string {
-  return `${JSON.stringify(sortJson(document), null, 2)}\n`;
-}
 
 export async function parseMetadata(path: string): Promise<Metadata> {
   let text: string;
@@ -273,10 +251,5 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
 }
 
 /* v8 ignore start -- the process entrypoint is exercised by mise and Actions */
-function isMain(): boolean {
-  const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(resolve(entrypoint)).href;
-}
-
-if (isMain()) process.exitCode = await main();
+if (isMain(import.meta.url)) process.exitCode = await main();
 /* v8 ignore stop */
