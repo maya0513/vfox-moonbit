@@ -35,16 +35,20 @@ baseline when the development toolchain is refreshed.
 ## Install with standalone vfox
 
 Until the plugin is accepted into the public vfox registry, install its release
-archive directly. Replace `0.1.1` with the current plugin release version:
+archive directly. Replace `0.1.2` with the current plugin release version and
+initialize vfox for your shell as described by `vfox activate`:
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.1/vfox-moonbit-0.1.1.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.2/vfox-moonbit-0.1.2.zip moonbit
 vfox install --yes moonbit@latest
-# Linux and macOS
-vfox exec moonbit@latest -- moon version --all --json --no-path
-# Windows with vfox 1.0.12 (its `exec` PATH lookup requires the suffix)
-vfox exec moonbit@latest -- moon.exe version --all --json --no-path
+vfox use moonbit@latest
+moon version --all --json --no-path
 ```
+
+vfox 1.0.12 resolves `latest` for `install` and `use`, but its `exec` command
+expects an exact installed version. Non-interactive callers should pass the
+exact version printed by `vfox install`, for example
+`vfox exec moonbit@0.x.y+build-id -- moon ...` (`moon.exe` on Windows).
 
 CI currently verifies vfox 1.0.12. This is the current tested baseline, not a
 maximum version; newer compatible vfox releases are expected to work.

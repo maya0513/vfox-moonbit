@@ -29,17 +29,20 @@ mise も動作する想定です。開発 tool 更新時に CI の確認版も�
 
 ## standalone vfox で使う
 
-public registry 採用前は Release の ZIP を直接追加します。`0.1.1` は現在の
-プラグイン版へ置き換えてください。
+public registry 採用前は Release の ZIP を直接追加します。`0.1.2` は現在の
+プラグイン版へ置き換え、`vfox activate` の案内に従ってshell連携を初期化してください。
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.1/vfox-moonbit-0.1.1.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.2/vfox-moonbit-0.1.2.zip moonbit
 vfox install --yes moonbit@latest
-# Linux / macOS
-vfox exec moonbit@latest -- moon version --all --json --no-path
-# Windows + vfox 1.0.12（`exec` のPATH検索では拡張子が必要）
-vfox exec moonbit@latest -- moon.exe version --all --json --no-path
+vfox use moonbit@latest
+moon version --all --json --no-path
 ```
+
+vfox 1.0.12 は `install` と `use` では `latest` を解決しますが、`exec` には
+インストール済みの完全版が必要です。非対話環境では `vfox install` が表示した版を使い、
+`vfox exec moonbit@0.x.y+build-id -- moon ...` のように実行してください
+（Windowsでは `moon.exe`）。
 
 CI で現在実動作を確認する基準版は vfox 1.0.12 です。これは上限ではなく、以降の
 互換性がある vfox も動作する想定です。
