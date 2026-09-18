@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /** Run real-download integration tests through mise and/or standalone vfox. */
 
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import {
@@ -20,12 +19,32 @@ import {
 import { createServer, Server } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { build, releaseFiles } from './package_plugin.ts';
+import { compareText, errorMessage, isMain, isRecord } from './lib/common.ts';
+import { EXACT_VERSION_RE } from './lib/project.ts';
+import {
+  containsAdjacentPathEntries,
+  E2EError,
+  environmentValue,
+  normalizedPath,
+  pathsReferToSameEntry,
+  run,
+  type RunOptions,
+  type RunResult,
+} from './e2e/process.ts';
 
-export const EXACT_VERSION_RE =
-  /^0\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\+[0-9A-Za-z][0-9A-Za-z._-]*$/;
+export { EXACT_VERSION_RE };
+export {
+  containsAdjacentPathEntries,
+  E2EError,
+  environmentValue,
+  normalizedPath,
+  pathsReferToSameEntry,
+  run,
+};
+export type { RunOptions, RunResult };
 export const REQUIRED_EXECUTABLES = [
   'moon',
   'moonc',
@@ -37,134 +56,8 @@ export const REQUIRED_EXECUTABLES = [
 ] as const;
 export const HELPER_EXECUTABLES = ['moon-lsp', 'moon-ide'] as const;
 
-export class E2EError extends Error {}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function isErrno(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function normalizedPath(path: string): string {
-  const normalized = resolve(path);
-  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-}
-
-export async function pathsReferToSameEntry(left: string, right: string): Promise<boolean> {
-  try {
-    const [resolvedLeft, resolvedRight] = await Promise.all([realpath(left), realpath(right)]);
-    return normalizedPath(resolvedLeft) === normalizedPath(resolvedRight);
-  } catch {
-    return normalizedPath(left) === normalizedPath(right);
-  }
-}
-
-export function environmentValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
-  const exact = env[name];
-  if (exact !== undefined) return exact;
-  const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === name.toUpperCase());
-  return key === undefined ? undefined : env[key];
-}
-
-export async function containsAdjacentPathEntries(
-  entries: readonly string[],
-  expected: readonly string[],
-): Promise<boolean> {
-  if (expected.length === 0) return true;
-  const indexes: number[] = [];
-  for (const expectedPath of expected) {
-    const matches = await Promise.all(
-      entries.map((entry) => pathsReferToSameEntry(entry, expectedPath)),
-    );
-    indexes.push(matches.indexOf(true));
-  }
-  const first = indexes[0] ?? -1;
-  return first >= 0 && indexes.every((index, offset) => index === first + offset);
-}
-
-function printCaptured(text: string, error = false): void {
-  if (text === '') return;
-  const output = text.endsWith('\n') ? text : `${text}\n`;
-  if (error) process.stderr.write(output);
-  else process.stdout.write(output);
-}
-
-export interface RunOptions {
-  cwd: string;
-  env: NodeJS.ProcessEnv;
-  timeoutSeconds?: number;
-  check?: boolean;
-  input?: string;
-}
-
-export interface RunResult {
-  returnCode: number;
-  stdout: string;
-  stderr: string;
-}
-
-export async function run(command: readonly string[], options: RunOptions): Promise<RunResult> {
-  const executable = command[0];
-  if (executable === undefined) throw new E2EError('command must not be empty');
-  const display = command.join(' ');
-  console.log(`$ ${display}`);
-  const timeoutSeconds = options.timeoutSeconds ?? 600;
-  const result = await new Promise<RunResult>((resolveRun, rejectRun) => {
-    const child = spawn(executable, command.slice(1), {
-      cwd: options.cwd,
-      env: options.env,
-      shell: false,
-      stdio: 'pipe',
-      windowsHide: true,
-    });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    let timedOut = false;
-    let settled = false;
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(Buffer.from(chunk)));
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(Buffer.from(chunk)));
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, timeoutSeconds * 1000);
-    child.once('error', (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      rejectRun(new E2EError(`cannot run command ${display}: ${error.message}`, { cause: error }));
-    });
-    child.once('close', (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      const captured = {
-        returnCode: code ?? -1,
-        stderr: Buffer.concat(stderr).toString('utf8'),
-        stdout: Buffer.concat(stdout).toString('utf8'),
-      };
-      printCaptured(captured.stdout);
-      printCaptured(captured.stderr, true);
-      if (timedOut)
-        rejectRun(new E2EError(`command timed out after ${timeoutSeconds} seconds: ${display}`));
-      else resolveRun(captured);
-    });
-    if (options.input !== undefined) child.stdin.end(options.input);
-    else child.stdin.end();
-  });
-  if ((options.check ?? true) && result.returnCode !== 0) {
-    throw new E2EError(`command exited ${result.returnCode}: ${display}`);
-  }
-  return result;
 }
 
 async function sha256File(path: string): Promise<string> {
@@ -755,9 +648,4 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
   return 0;
 }
 
-function isMain(): boolean {
-  const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(resolve(entrypoint)).href;
-}
-
-if (isMain()) process.exitCode = await main();
+if (isMain(import.meta.url)) process.exitCode = await main();

@@ -4,16 +4,16 @@
 import { spawnSync } from 'node:child_process';
 import { lstat, readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { parseMetadata } from './package_plugin.ts';
 import { validateLocal } from './update_latest.ts';
+import { compareText, isMain, isRecord } from './lib/common.ts';
+import { EXPECTED_REPOSITORY, OWNER, REPOSITORY } from './lib/project.ts';
 
-export const OWNER = 'maya0513';
-export const REPOSITORY = 'vfox-moonbit';
-export const EXPECTED_REPOSITORY = `${OWNER}/${REPOSITORY}`;
+export { EXPECTED_REPOSITORY, OWNER, REPOSITORY };
 const ACTION_RE = /^\s*(?:-\s+)?uses:\s*([^\s#]+)/gm;
-const PINNED_ACTION_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/;
+const PINNED_ACTION_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/;
 const REMOTE_RE = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(?:\.git)?$/;
 const FORBIDDEN_WORKFLOW_TOOL_RE =
   /\b(?:actions\/setup-python|python(?:3(?:\.\d+)?)?|uv|pytest|ruff)\b/i;
@@ -29,14 +29,6 @@ const APPROVED_DEV_DEPENDENCIES = {
 } as const;
 
 export class RepositoryError extends Error {}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function compareText(left: string, right: string): number {
-  return Buffer.compare(Buffer.from(left), Buffer.from(right));
-}
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -274,6 +266,7 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     'pnpm-workspace.yaml',
     'tsconfig.json',
     'vite.config.ts',
+    'vite.tasks.ts',
   ];
   const missing = [];
   for (const name of required) if (!(await exists(join(repository, name)))) missing.push(name);
@@ -291,12 +284,13 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     : undefined;
   if (
     packageDocument.private !== true ||
+    packageDocument.version !== undefined ||
     packageDocument.type !== 'module' ||
     engines?.node !== '24.21.0' ||
     packageDocument.packageManager !== 'pnpm@12.4.2'
   ) {
     throw new RepositoryError(
-      'package.json must pin the approved private Node.js and pnpm toolchain',
+      'package.json must pin the approved Node.js and pnpm toolchain and remain private and unversioned',
     );
   }
   if (
@@ -347,6 +341,43 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   const mise = await readFile(join(repository, 'mise.toml'), 'utf8');
   if (!/^node\s*=\s*"24\.21\.0"$/m.test(mise) || !/^pnpm\s*=\s*"12\.4\.2"$/m.test(mise)) {
     throw new RepositoryError('mise.toml must pin the approved Node.js and pnpm versions');
+  }
+  for (const task of [
+    'fmt:check',
+    'lint',
+    'test:unit',
+    'coverage',
+    'docs:check',
+    'e2e',
+    'package',
+    'update:check',
+    'ci',
+  ]) {
+    if (!mise.includes(`pnpm exec vp run ${task}`)) {
+      throw new RepositoryError(`mise task ${task} must delegate to the Vite+ task graph`);
+    }
+  }
+
+  const viteConfig = await readFile(join(repository, 'vite.config.ts'), 'utf8');
+  const viteTasks = await readFile(join(repository, 'vite.tasks.ts'), 'utf8');
+  if (
+    !viteConfig.includes("import { tasks } from './vite.tasks.ts'") ||
+    !viteConfig.includes('tasks: true') ||
+    !viteConfig.includes('tasks,')
+  ) {
+    throw new RepositoryError('Vite+ configuration must enable and import the cached task graph');
+  }
+  if ((viteTasks.match(/cache: false/g) ?? []).length !== 3) {
+    throw new RepositoryError('only E2E and upstream discovery Vite+ tasks may disable caching');
+  }
+
+  const ciWorkflow = await readFile(join(repository, '.github', 'workflows', 'ci.yml'), 'utf8');
+  if (
+    !ciWorkflow.includes('node_modules/.vite/task-cache') ||
+    !ciWorkflow.includes('actions/cache/restore@') ||
+    !ciWorkflow.includes('actions/cache/save@')
+  ) {
+    throw new RepositoryError('CI must restore and save the isolated Vite Task cache');
   }
   const files = await repositoryFiles(repository);
   const forbidden = files.filter(
@@ -442,10 +473,5 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
 }
 
 /* v8 ignore start -- the process entrypoint is exercised by mise and Actions */
-function isMain(): boolean {
-  const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(resolve(entrypoint)).href;
-}
-
-if (isMain()) process.exitCode = await main();
+if (isMain(import.meta.url)) process.exitCode = await main();
 /* v8 ignore stop */

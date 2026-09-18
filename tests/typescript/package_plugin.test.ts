@@ -30,7 +30,7 @@ import {
 } from '../../scripts/package_plugin.ts';
 
 const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const PLUGIN_VERSION = '0.1.2';
+const PLUGIN_VERSION = '0.1.3';
 const execFileAsync = promisify(execFile);
 let temporary: string;
 

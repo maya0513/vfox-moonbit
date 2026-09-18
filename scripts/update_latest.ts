@@ -1,33 +1,33 @@
 #!/usr/bin/env node
 /** Safely promote a complete MoonBit stable release into immutable manifests. */
 
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import {
-  mkdir,
-  mkdtemp,
-  open,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, open, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { crc32 as calculateCrc32 } from 'node:zlib';
 
 import { list as listTar } from 'tar';
 import * as yauzl from 'yauzl';
 
+import { canonicalJson, errorMessage, isMain, isRecord } from './lib/common.ts';
+import { EXACT_VERSION_RE, SHA256_RE } from './lib/project.ts';
+import { Downloader, type DownloadedFile, type DownloaderLike } from './update/download.ts';
+import {
+  IncompleteRelease,
+  ManualReviewRequired,
+  SupplyChainError,
+  UpdateError,
+} from './update/errors.ts';
+
+export { Downloader, IncompleteRelease, ManualReviewRequired, SupplyChainError, UpdateError };
+export type { DownloadedFile, DownloaderLike };
+
 export const SCHEMA = 1;
 export const RECIPE = 1;
 export const CDN = 'https://cli.moonbitlang.com';
-export const EXACT_VERSION_RE =
-  /^(0)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\+([0-9A-Za-z][0-9A-Za-z._-]*)$/;
-export const SHA256_RE = /^[0-9a-f]{64}$/;
+export { canonicalJson, EXACT_VERSION_RE, SHA256_RE };
 const DRIVE_RE = /^[A-Za-z]:/;
 
 export interface Limits {
@@ -49,11 +49,6 @@ export const DEFAULT_LIMITS: Readonly<Limits> = {
   uncompressedBytes: 4 * 1024 * 1024 * 1024,
   metadataBytes: 1024 * 1024,
 };
-
-export class UpdateError extends Error {}
-export class IncompleteRelease extends UpdateError {}
-export class SupplyChainError extends UpdateError {}
-export class ManualReviewRequired extends SupplyChainError {}
 
 export interface Platform {
   key: string;
@@ -119,106 +114,6 @@ const INSTALLER_MARKERS: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-export interface DownloadedFile {
-  path: string;
-  size: number;
-  sha256: string;
-}
-
-export interface DownloaderLike {
-  fetch(url: string, maxBytes: number): Promise<DownloadedFile>;
-}
-
-export class Downloader implements DownloaderLike {
-  readonly timeoutMs: number;
-  readonly fetchImplementation: typeof fetch;
-  #temporaryDirectory: string | undefined;
-
-  constructor(options: { timeoutMs?: number; fetchImplementation?: typeof fetch } = {}) {
-    this.timeoutMs = options.timeoutMs ?? 90_000;
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
-  }
-
-  async fetch(url: string, maxBytes: number): Promise<DownloadedFile> {
-    if (!url.startsWith('https://')) {
-      throw new UpdateError(`refusing non-HTTPS download: ${url}`);
-    }
-
-    let response: Response;
-    try {
-      response = await this.fetchImplementation(url, {
-        headers: {
-          Accept: 'application/octet-stream',
-          'User-Agent': 'maya0513/vfox-moonbit updater',
-        },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (error) {
-      throw new UpdateError(`failed to download ${url}: ${errorMessage(error)}`, { cause: error });
-    }
-
-    if (!response.ok) {
-      if ([403, 404, 409].includes(response.status)) {
-        throw new IncompleteRelease(`artifact is not published yet (${response.status}): ${url}`);
-      }
-      throw new UpdateError(`HTTP ${response.status} while downloading ${url}`);
-    }
-
-    const lengthHeader = response.headers.get('content-length');
-    if (lengthHeader !== null) {
-      const length = Number(lengthHeader);
-      if (!Number.isSafeInteger(length) || length < 0) {
-        throw new UpdateError(`invalid Content-Length while downloading ${url}`);
-      }
-      if (length > maxBytes) {
-        throw new SupplyChainError(`download exceeds size limit: ${url}`);
-      }
-    }
-    if (response.body === null) {
-      throw new UpdateError(`download returned no response body: ${url}`);
-    }
-
-    const directory = await this.#directory();
-    const destination = join(directory, `${randomUUID()}.part`);
-    const handle = await open(destination, 'wx', 0o600);
-    const hash = createHash('sha256');
-    let size = 0;
-    try {
-      for await (const value of response.body) {
-        const chunk = Buffer.from(value);
-        size += chunk.length;
-        if (size > maxBytes) {
-          throw new SupplyChainError(`download exceeds size limit: ${url}`);
-        }
-        hash.update(chunk);
-        await handle.writeFile(chunk);
-      }
-    } catch (error) {
-      await handle.close().catch(() => undefined);
-      await rm(destination, { force: true });
-      if (error instanceof UpdateError) {
-        throw error;
-      }
-      throw new UpdateError(`failed to download ${url}: ${errorMessage(error)}`, { cause: error });
-    }
-    await handle.close();
-    return { path: destination, size, sha256: hash.digest('hex') };
-  }
-
-  async dispose(): Promise<void> {
-    if (this.#temporaryDirectory !== undefined) {
-      const directory = this.#temporaryDirectory;
-      this.#temporaryDirectory = undefined;
-      await rm(directory, { force: true, recursive: true });
-    }
-  }
-
-  async #directory(): Promise<string> {
-    this.#temporaryDirectory ??= await mkdtemp(join(tmpdir(), 'vfox-moonbit-updater-'));
-    return this.#temporaryDirectory;
-  }
-}
-
 interface ArchiveInspection {
   names: Set<string>;
   moonMod?: Buffer;
@@ -249,10 +144,6 @@ export interface LatestPointer {
   manifest: string;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function encodeVersion(version: string): string {
   if (!EXACT_VERSION_RE.test(version)) {
     throw new ManualReviewRequired(
@@ -260,24 +151,6 @@ export function encodeVersion(version: string): string {
     );
   }
   return version.replace('+', '%2B');
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortJson);
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .toSorted(([left], [right]) => Buffer.compare(Buffer.from(left), Buffer.from(right)))
-        .map(([key, child]) => [key, sortJson(child)]),
-    );
-  }
-  return value;
-}
-
-export function canonicalJson(document: unknown): string {
-  return `${JSON.stringify(sortJson(document), null, 2)}\n`;
 }
 
 export function safeName(rawName: string): string {
@@ -635,10 +508,6 @@ export function parseChecksum(data: Buffer, expectedFilename: string): string {
     throw new SupplyChainError(`malformed official checksum for ${expectedFilename}`);
   }
   return match[1].toLowerCase();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isErrno(error: unknown, code: string): boolean {
@@ -1082,12 +951,7 @@ export async function main(
 }
 
 /* v8 ignore start -- the process entrypoint is exercised by mise and Actions */
-function isMain(): boolean {
-  const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(resolve(entrypoint)).href;
-}
-
-if (isMain()) {
+if (isMain(import.meta.url)) {
   process.exitCode = await main();
 }
 /* v8 ignore stop */

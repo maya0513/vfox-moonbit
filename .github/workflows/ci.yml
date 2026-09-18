@@ -71,8 +71,23 @@ jobs:
       - name: Bootstrap locked test dependencies
         run: mise run bootstrap
 
+      - name: Restore Vite Task cache
+        id: vite-task-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Run deterministic CI suite
         run: mise run ci
+
+      - name: Save Vite Task cache
+        if: success()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   mise_lock:
     name: mise-lock (mise 2026.9.2)
@@ -140,7 +155,7 @@ jobs:
       - name: Run real-download E2E through mise
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: pnpm exec vp exec node scripts/e2e.ts --backend mise
+        run: pnpm exec vp run e2e
 
   vfox_e2e:
     name: vfox-e2e (${{ matrix.os }}, vfox 1.0.12)
@@ -191,7 +206,7 @@ jobs:
         shell: bash
         run: >-
           mise exec node@24.21.0 pnpm@12.4.2 vfox@1.0.12 --
-          pnpm exec vp exec node scripts/e2e.ts --backend vfox --allow-vfox-user-state
+          pnpm exec vp run e2e:vfox
 
   required:
     name: required

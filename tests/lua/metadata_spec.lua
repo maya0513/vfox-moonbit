@@ -3,7 +3,7 @@ describe("plugin metadata", function()
         _G.PLUGIN = nil
         assert(loadfile("metadata.lua"))()
         assert.equals("moonbit", PLUGIN.name)
-        assert.equals("0.1.2", PLUGIN.version)
+        assert.equals("0.1.3", PLUGIN.version)
         assert.equals("https://github.com/maya0513/vfox-moonbit", PLUGIN.homepage)
         assert.equals("Apache-2.0", PLUGIN.license)
         assert.equals("1.0.12", PLUGIN.minRuntimeVersion)

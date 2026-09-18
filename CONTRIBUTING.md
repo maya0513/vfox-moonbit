@@ -1,9 +1,9 @@
 # Contributing
 
-## Local checks
+## Development workflow
 
-Install the pinned toolset with mise, then bootstrap locked TypeScript and Lua test
-dependencies:
+Install the locked toolchain and dependencies, then run the same deterministic
+suite used by GitHub Actions:
 
 ```shell
 mise install
@@ -11,37 +11,66 @@ mise run bootstrap
 mise run ci
 ```
 
-The repository currently requires and verifies mise 2026.9.2 and vfox 1.0.12.
-They are moving tested baselines rather than maximum versions; update the
-configuration, lockfile, workflows, documentation, and metadata together when
-advancing either manager.
+mise 2026.9.2 and vfox 1.0.12 are moving tested versions, not compatibility
+floors. Advance configuration, lockfiles, workflows, metadata, tests, and
+documentation together.
 
-Run the networked mise E2E separately with `mise run e2e`. Standalone vfox
-writes its own manager state under the current user's home, so that backend is
-run by GitHub-hosted ephemeral workers. To opt in locally, run:
+Vite+ owns the task graph behind the public mise commands. Cacheable tasks use
+source/configuration inputs; coverage reports and `dist` are the only restored
+outputs. Real downloads and mutable manager state are deliberately uncached.
+
+Useful focused commands are:
 
 ```shell
-pnpm exec vp exec node scripts/e2e.ts --backend vfox --allow-vfox-user-state
+mise run fmt:check
+mise run lint
+mise run test:unit
+mise run coverage
+mise run docs:check
+mise run update:check
+mise run package
+mise run e2e
 ```
 
-The tests set an isolated mutable `MOON_HOME` and assert that the real
-`~/.moon` is unchanged.
+Run a task twice to inspect a local cache hit. Clear Vite Task results with
+`pnpm exec vp cache clean`. The cache lives under ignored `node_modules` and is
+never part of a release archive.
+
+Standalone vfox writes manager state under the current home. GitHub-hosted
+ephemeral workers run that E2E by default. Explicit local opt-in is:
+
+```shell
+pnpm exec vp run e2e:vfox
+```
+
+The harness isolates mutable `MOON_HOME` and verifies that the real `~/.moon`
+is unchanged.
 
 ## Release manifests
 
-Do not edit an existing `releases/<exact-version>.json`. Run
-`mise run update:check` for an offline validation or
-`pnpm exec vp exec node scripts/update_latest.ts --dry-run` for a networked discovery without
-writes. The scheduled workflow is the normal path for updates.
+Existing `releases/<exact-version>.json` files are immutable. Use
+`mise run update:check` for offline validation. Networked discovery is:
 
-If the installer recipe, archive layout, version schema, or major version
-changes, update the recipe only after manual review and tests. Never add
-MoonBit archives to the repository.
+```shell
+pnpm exec vp run update:discover
+```
+
+The scheduled workflow is the normal promotion path. It stops for manual
+review when installer markers, archive layout, version schema, recipe, or the
+MoonBit major version changes. Never add MoonBit archives to this repository.
 
 ## Plugin releases
 
-Plugin code follows SemVer independently from MoonBit. Update
-`PLUGIN.version` in `metadata.lua`, merge it through normal review, and push a
-matching `vX.Y.Z` tag. The release workflow builds a deterministic ZIP,
-checksum, manifest, and GitHub artifact attestation. A release-manifest-only
-MoonBit update does not create a plugin release.
+Plugin SemVer is independent of the installed MoonBit version. Its only source
+of truth is `PLUGIN.version` in `metadata.lua`; the private maintenance package
+has no separate version.
+
+After a normal reviewed merge and successful main CI:
+
+1. create an annotated `vX.Y.Z` tag matching `PLUGIN.version`;
+2. push the tag without rewriting it;
+3. let the release workflow run full CI and create the deterministic ZIP,
+   checksum, registry manifest, and artifact attestation;
+4. verify the published checksum, attestation, and standalone-vfox install.
+
+A MoonBit manifest-only update does not create a plugin release.

@@ -2,17 +2,18 @@
 
 [English](README.md)
 
-[vfox](https://vfox.dev/) 単体と mise の traditional vfox backend の両方で使える、
-最新版の安定版 [MoonBit](https://www.moonbitlang.com/) 用プラグインです。
+standalone vfox と mise の traditional vfox backend で使える、最新版の安定版
+[MoonBit](https://www.moonbitlang.com/) toolchain用プラグインです。
 
-MoonBit はまだ 1.0 未満であるため、公開するチャンネルは意図的に `latest` 一つだけです。
-過去版一覧、nightly/dev、範囲指定、部分バージョンは提供しません。インストール時に
-`latest` を `0.x.y+build-id` 形式の完全版へ解決し、mise の lock と再試行に限って
-その完全版も受け付けます。
+MoonBitは1.0未満なので、公開channelは意図的に`latest`だけです。インストール時に
+`0.x.y+build-id`形式の完全版へ解決し、その値はlockfileと再現可能な再試行に限って
+受け付けます。過去版一覧、範囲、部分版、nightly、development channelは対象外です。
 
-## mise で使う
+## インストール
 
-Git を先に `PATH` へ用意し、`mise.toml` に次を記載します。
+Gitを先に`PATH`へ用意してください。
+
+### mise
 
 ```toml
 [tools]
@@ -24,113 +25,103 @@ mise install
 mise exec -- moon version --all --json --no-path
 ```
 
-CI で現在実動作を確認する基準版は mise 2026.9.2 です。これは上限ではなく、以降の
-mise も動作する想定です。開発 tool 更新時に CI の確認版も最新版へ追随させます。
+CIで現在確認しているmiseは2026.9.2です。互換性の下限や上限ではなく、定期的に
+前進させる実動作確認版です。
 
-## standalone vfox で使う
+### standalone vfox
 
-public registry 採用前は Release の ZIP を直接追加します。`0.1.2` は現在の
-プラグイン版へ置き換え、`vfox activate` の案内に従ってshell連携を初期化してください。
+public registry採用前はRelease archiveを直接追加します。
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.2/vfox-moonbit-0.1.2.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.3/vfox-moonbit-0.1.3.zip moonbit
 vfox install --yes moonbit@latest
 vfox use moonbit@latest
 moon version --all --json --no-path
 ```
 
-vfox 1.0.12 は `install` と `use` では `latest` を解決しますが、`exec` には
-インストール済みの完全版が必要です。非対話環境では `vfox install` が表示した版を使い、
-`vfox exec moonbit@0.x.y+build-id -- moon ...` のように実行してください
-（Windowsでは `moon.exe`）。
+CIで現在確認しているvfoxは1.0.12です。`install`と`use`は`latest`を解決しますが、
+非対話の`vfox exec`にはインストール済みの完全版が必要です。
 
-CI で現在実動作を確認する基準版は vfox 1.0.12 です。これは上限ではなく、以降の
-互換性がある vfox も動作する想定です。
+```shell
+vfox exec moonbit@0.x.y+build-id -- moon version --all --json --no-path
+```
 
-## インストールの仕組み
+Windowsでは最後のコマンドに`moon.exe`を使います。
 
-MoonBit の toolchain 本体と同時リリースされる `core` 標準ライブラリを一組として
-扱います。
+## インストール契約
 
-- 本体は MoonBit 公式 CDN と公式 SHA-256 のみを使います。
-- updater は latest と exact の core が同一内容であることを確認し、SHA-256 を
-  immutable な exact manifest に記録します。
-- インストール時は exact manifest を再取得し、core を `.part` に保存して hash を
-  検証してから展開します。`core/moon.mod` の版も完全一致させ、公式 installer と
-  同じ二つの bundle コマンドを実行します。
-- `PATH` は `<install-root>/shims`、`<install-root>/bin` の順に設定し、不変な
-  toolchain と core は `MOON_TOOLCHAIN_ROOT=<install-root>` で選択します。
-- 可変なユーザー状態の `MOON_HOME` は上書きしません。現行バイナリがcore探索に
-  まだ必要とするため、`moon-lsp` と `moon-ide` の互換shim内だけでinstall rootを
-  `MOON_HOME` に設定します。
+MoonBitが公開するplatform toolchainと対応する`core`標準ライブラリを、一つの検証済み
+releaseとして扱います。
 
-MoonBit のバイナリはこのリポジトリで再配布・ミラーしません。過去の exact manifest
-は残しますが、公式 CDN から削除された版の再インストールまでは保証できません。
+- toolchainは公式CDNとMoonBit公式SHA-256だけを使います。
+- updaterはlatestとexactのcore archiveがbyte単位で一致した場合だけexact SHA-256を
+  記録します。
+- インストール時はimmutableなexact manifestを再取得し、coreを`.part`へdownloadして
+  展開前に検証し、`core/moon.mod`も確認します。
+- coreはtransactionとして昇格し、bundleまたはshim生成に失敗するとrollbackします。
+- 公式installerと同じ二つのbundle commandを、隔離した一時homeで実行します。
 
-moonup は設計上の参考に限定しています。実行ファイル、API、`setup-moonup`、
-`moonbit-version`、`moonbit-binaries`、配布サービスは一切使いません。
+リポジトリが保持するのはmanifestとplugin codeだけです。MoonBit archiveはmirrorも
+再配布もしません。過去のexact manifestは残しますが、再インストールには対応する
+公式CDN objectが必要です。
 
-## 対応環境
+moonupは設計上の参考に限ります。実行ファイル、API、setup action、binary repository、
+配布serviceは使いません。
 
-| ホスト | 本体 | core |
+## 対応host
+
+| Host | Toolchain | Core |
 | --- | --- | --- |
 | Linux x86_64、glibc | `tar.gz` | `tar.gz` |
 | Linux arm64、glibc | `tar.gz` | `tar.gz` |
 | macOS arm64 | `tar.gz` | `tar.gz` |
 | Windows x86_64 | `zip` | `zip` |
 
-macOS Intel、Windows ARM64 emulation、32-bit、musl/Alpine、その他 OS は明示的に
-拒否します。NixOS は `nix-ld` などで公式 glibc ELF を実行できる環境に限る
-best-effort で、正式なテスト対象ではありません。
+macOS Intel、Windows ARM64 emulation、32-bit、musl/Alpine、その他OSは拒否します。
+NixOSは`nix-ld`などで公式のglibc-linked ELFを実行できる場合だけbest-effortです。
 
-MoonBit が利用する Git は必須です。native target で必要になる platform 固有の
-tool や library はこのプラグインの管理対象外です。Windows のインストール処理は、
-path を安全に扱うため OS 標準の Windows PowerShell（`powershell.exe`）を使います。
+MoonBitのnative targetが必要とするplatform固有のtoolやlibraryは管理対象外です。
+Windowsのインストールでは、pathを安全に扱うためOS標準のWindows PowerShellを使います。
 
-## 認証、状態、IDE
+## 環境変数と可変状態
 
-プラグインのインストーラーは `~/.moon`、shell 設定、認証情報に触れません。認証、
-package index、cache は通常の可変な `MOON_HOME`（未指定時は `~/.moon`）を使うため、
-mise/vfox でtoolchainを更新しても保持されます。利用者が設定済みの `MOON_HOME` も
-上書きしません。
+| 値 | 挙動 |
+| --- | --- |
+| `PATH` | 選択したinstall rootの`shims`と`bin`を先頭へ追加します。 |
+| `MOON_TOOLCHAIN_ROOT` | 選択したimmutableなtoolchainとcoreを指します。 |
+| `MOON_HOME` | 呼び出し元が管理する可変状態で、pluginはexportしません。 |
 
-`MOON_TOOLCHAIN_ROOT` とhelper shimによりLSPとCLIが同じtoolchain/coreを参照するよう、
-IDEも管理環境から起動します。
+現行の`moon-lsp`と`moon-ide`はcore探索に`MOON_HOME`も参照するため、compatibility shimが
+そのprocessだけ上書きします。core bundleも隔離した一時値を使います。認証、package
+index、cacheは通常の`MOON_HOME`（一般には`~/.moon`）に残り、toolchain更新後も維持されます。
+
+editorは管理環境から起動してください。
 
 ```shell
 mise exec -- code .
-# または vfox activate 済み shell から
+# またはvfox activate済みshellから
 code .
 ```
 
-管理下のファイルを直接書き換える `moon upgrade` は使わず、mise/vfox から更新して
-ください。
+管理下のinstallを直接変更する`moon upgrade`は使わず、miseまたはvfoxから更新します。
 
-## 最新版の反映と cache
+## 最新版とcache
 
-updater は 6 時間ごとに確認し、全対応 platform の公開が完了して整合するまで昇格
-しません。vfox の Available cache は既定で最大 12 時間なので、upstream の公開完了
-から通常は約 18 時間 + CI 時間が反映目標です。
-
-すぐに再取得したい場合は次を実行します。
+updaterは6時間ごとに確認し、全対応platformで完全かつ整合するreleaseだけを昇格します。
+vfoxのAvailable cacheは最大12時間なので、upstream公開完了から通常約18時間とCI時間が
+反映目標です。
 
 ```shell
 mise cache clear
 vfox config cache.availableHookDuration 0
 vfox search moonbit
-```
-
-確認後は vfox の既定値へ戻せます。
-
-```shell
 vfox config cache.availableHookDuration 12h
 ```
 
 ## 開発
 
-開発 tool は `mise.toml`、`mise.lock`、`package.json`、`pnpm-lock.yaml`、
-`lua-rocks.lock` に固定します。保守 CLI と test は Node.js 24 上の native TypeScript
-として Vite+ 経由で実行し、生成 JavaScript は管理しません。
+開発toolはmise、pnpm、LuaRocksでlockします。Vite+がcache付きtask graphを管理し、miseは
+固定済み実行ファイルと安定した入口を提供します。
 
 ```shell
 mise install
@@ -139,14 +130,12 @@ mise run ci
 mise run e2e
 ```
 
-`mise run ci` は format、lint、型、workflow security、Lua 5.1 と TypeScript の unit
-test、manifest、line/branch/function/statement coverage を検査します。GitHub Actions
-の実 E2E は全対応ホストで mise と
-standalone vfox の両方を検証します。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) と
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
+`mise run ci`はformat、lint、型、workflow、文書の実装整合、unit test、coverage、manifest、
+deterministic packageを検査します。GitHub Actionsでは全対応hostについてmiseとstandalone
+vfoxの実download E2Eも実行します。詳細は[CONTRIBUTING.md](CONTRIBUTING.md)と
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)を参照してください。
 
 ## License
 
-プラグインは Apache-2.0 です。MoonBit 本体は公式配布元から直接取得し、この
-リポジトリでは再配布・再ライセンスしません。vendor した MIT component は
-[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) に記載しています。
+pluginはApache-2.0です。MoonBitはpublisherから直接downloadし、ここでは再licenseしません。
+vendorしたMIT codeは[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)に記載しています。
