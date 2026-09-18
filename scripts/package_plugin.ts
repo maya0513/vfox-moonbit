@@ -31,7 +31,11 @@ const ROOT_FILES = [
   'metadata.lua',
   'vendor-lock.json',
 ] as const;
-const ZIP_TIME = new Date(Date.UTC(1980, 0, 1, 0, 0, 0));
+// ZIP's legacy timestamp is a local wall-clock value. Use a local midnight and
+// omit the UTC extension so the encoded bytes do not depend on the host time
+// zone. The archive does not represent source mtimes; this is a reproducible
+// packaging sentinel.
+const ZIP_TIME = new Date(1980, 0, 1, 0, 0, 0);
 
 export type Metadata = Record<string, string | string[]>;
 
@@ -168,6 +172,7 @@ async function writeArchive(
     zip.addBuffer(await readFile(path), name, {
       compress: true,
       compressionLevel: 9,
+      forceDosTimestamp: true,
       mode: 0o100644,
       mtime: ZIP_TIME,
     });

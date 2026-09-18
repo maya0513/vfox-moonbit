@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import {
   copyFile,
   lstat,
@@ -13,6 +14,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import * as yauzl from 'yauzl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
@@ -28,6 +30,8 @@ import {
 } from '../../scripts/package_plugin.ts';
 
 const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const PLUGIN_VERSION = '0.1.1';
+const execFileAsync = promisify(execFile);
 let temporary: string;
 
 beforeEach(async () => {
@@ -82,7 +86,7 @@ describe('plugin metadata and release inputs', () => {
   it('parses required strings and lists', async () => {
     const metadata = await parseMetadata(join(REPOSITORY, 'metadata.lua'));
     expect(metadata.name).toBe('moonbit');
-    expect(metadata.version).toBe('0.1.0');
+    expect(metadata.version).toBe(PLUGIN_VERSION);
     expect(metadata.depends).toEqual(['git']);
     expect(metadata.legacyFilenames).toEqual([]);
     expect(metadata.notes).toHaveLength(2);
@@ -127,7 +131,7 @@ describe('plugin metadata and release inputs', () => {
 describe('deterministic package output', () => {
   it('builds byte-identical complete ZIP files, checksums, and manifests', async () => {
     const first = await build(REPOSITORY, join(temporary, 'first'));
-    const second = await build(REPOSITORY, join(temporary, 'second'), '0.1.0');
+    const second = await build(REPOSITORY, join(temporary, 'second'), PLUGIN_VERSION);
     const firstBytes = await readFile(first.archive);
     expect(firstBytes.equals(await readFile(second.archive))).toBe(true);
     await writeFile(first.archive, 'stale output');
@@ -135,11 +139,12 @@ describe('deterministic package output', () => {
     expect(firstBytes.equals(await readFile(rebuilt.archive))).toBe(true);
 
     const digest = createHash('sha256').update(firstBytes).digest('hex');
-    expect(await readFile(first.checksum, 'ascii')).toBe(`${digest}  vfox-moonbit-0.1.0.zip\n`);
+    expect(await readFile(first.checksum, 'ascii')).toBe(
+      `${digest}  vfox-moonbit-${PLUGIN_VERSION}.zip\n`,
+    );
     const manifest: unknown = JSON.parse(await readFile(first.manifest, 'utf8'));
     expect(manifest).toMatchObject({
-      downloadUrl:
-        'https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip',
+      downloadUrl: `https://github.com/maya0513/vfox-moonbit/releases/download/v${PLUGIN_VERSION}/vfox-moonbit-${PLUGIN_VERSION}.zip`,
       minRuntimeVersion: '1.0.12',
     });
 
@@ -150,9 +155,46 @@ describe('deterministic package output', () => {
     expect(metadata.names).toContain('lib/sha2.lua');
     expect(metadata.names).not.toContain('releases/latest.json');
     expect(new Set(metadata.modes)).toEqual(new Set([0o644]));
-    expect(new Set(metadata.dates.map((date) => date.toISOString()))).toEqual(
-      new Set(['1980-01-01T00:00:00.000Z']),
-    );
+    expect(
+      new Set(
+        metadata.dates.map((date) =>
+          [
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+            date.getHours(),
+            date.getMinutes(),
+            date.getSeconds(),
+          ].join('-'),
+        ),
+      ),
+    ).toEqual(new Set(['1980-0-1-0-0-0']));
+  });
+
+  it('builds byte-identical ZIP files across host time zones', async () => {
+    const script = join(REPOSITORY, 'scripts', 'package_plugin.ts');
+    const utc = join(temporary, 'utc');
+    const tokyo = join(temporary, 'tokyo');
+    const argumentsFor = (output: string) => [
+      script,
+      '--repo',
+      REPOSITORY,
+      '--output',
+      output,
+      '--version',
+      PLUGIN_VERSION,
+    ];
+    await execFileAsync(process.execPath, argumentsFor(utc), {
+      env: { ...process.env, TZ: 'UTC' },
+    });
+    await execFileAsync(process.execPath, argumentsFor(tokyo), {
+      env: { ...process.env, TZ: 'Asia/Tokyo' },
+    });
+    expect(
+      (await readFile(join(utc, `vfox-moonbit-${PLUGIN_VERSION}.zip`))).equals(
+        await readFile(join(tokyo, `vfox-moonbit-${PLUGIN_VERSION}.zip`)),
+      ),
+    ).toBe(true);
   });
 
   it.each(['v1.2.3', '1.2', '01.2.3', '1.2.3-beta'])(
@@ -183,11 +225,11 @@ describe('deterministic package output', () => {
   it('sorts canonical JSON and parses CLI options', () => {
     expect(canonicalJson({ b: 1, a: 2 })).toBe('{\n  "a": 2,\n  "b": 1\n}\n');
     expect(
-      parseArguments(['--repo', REPOSITORY, '--output', temporary, '--version', '0.1.0']),
+      parseArguments(['--repo', REPOSITORY, '--output', temporary, '--version', PLUGIN_VERSION]),
     ).toEqual({
       output: temporary,
       repository: REPOSITORY,
-      version: '0.1.0',
+      version: PLUGIN_VERSION,
     });
     expect(() => parseArguments(['--repo'])).toThrow('requires');
     expect(() => parseArguments(['--unknown'])).toThrow('unknown');

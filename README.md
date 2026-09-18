@@ -35,10 +35,10 @@ baseline when the development toolchain is refreshed.
 ## Install with standalone vfox
 
 Until the plugin is accepted into the public vfox registry, install its release
-archive directly. Replace `0.1.0` with the current plugin release version:
+archive directly. Replace `0.1.1` with the current plugin release version:
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.0/vfox-moonbit-0.1.0.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.1/vfox-moonbit-0.1.1.zip moonbit
 vfox install --yes moonbit@latest
 # Linux and macOS
 vfox exec moonbit@latest -- moon version --all --json --no-path
