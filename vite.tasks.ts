@@ -29,7 +29,6 @@ const repositoryPolicyInputs = [
   '.gitattributes',
   '.gitignore',
   '.github/**/*',
-  'CONTRIBUTING.md',
   'LICENSE',
   'README.md',
   'README.ja.md',
