@@ -66,21 +66,18 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
   const documentNames = [
     'README.md',
     'README.ja.md',
-    'CONTRIBUTING.md',
     'SECURITY.md',
     'docs/ARCHITECTURE.md',
     'docs/ARCHITECTURE.ja.md',
   ] as const;
-  const [metadata, mise, readme, readmeJa, contributing, architecture, architectureJa] =
-    await Promise.all([
-      parseMetadata(join(repository, 'metadata.lua')),
-      readFile(join(repository, 'mise.toml'), 'utf8'),
-      readFile(join(repository, 'README.md'), 'utf8'),
-      readFile(join(repository, 'README.ja.md'), 'utf8'),
-      readFile(join(repository, 'CONTRIBUTING.md'), 'utf8'),
-      readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
-      readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
-    ]);
+  const [metadata, mise, readme, readmeJa, architecture, architectureJa] = await Promise.all([
+    parseMetadata(join(repository, 'metadata.lua')),
+    readFile(join(repository, 'mise.toml'), 'utf8'),
+    readFile(join(repository, 'README.md'), 'utf8'),
+    readFile(join(repository, 'README.ja.md'), 'utf8'),
+    readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
+    readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
+  ]);
   const pluginVersion = metadata.version;
   if (typeof pluginVersion !== 'string') throw new DocumentationError('plugin version is missing');
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
@@ -120,7 +117,7 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     }
   }
   const availableTasks = miseTasks(mise);
-  for (const task of documentedTasks(`${readme}\n${readmeJa}\n${contributing}`)) {
+  for (const task of documentedTasks(`${readme}\n${readmeJa}`)) {
     if (!availableTasks.has(task))
       throw new DocumentationError(`documentation uses unknown mise task: ${task}`);
   }

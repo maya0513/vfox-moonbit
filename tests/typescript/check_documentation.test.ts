@@ -51,7 +51,6 @@ async function fixture(): Promise<void> {
     ),
     write(join(temporary, 'README.md'), readme('[architecture](docs/ARCHITECTURE.md)')),
     write(join(temporary, 'README.ja.md'), readme()),
-    write(join(temporary, 'CONTRIBUTING.md'), 'Run `mise run ci`.\n'),
     write(join(temporary, 'SECURITY.md'), 'Security\n'),
     write(
       join(temporary, 'docs', 'ARCHITECTURE.md'),
@@ -99,7 +98,7 @@ describe('documentation checker', () => {
     await expect(validateDocumentation(temporary)).rejects.toThrow('mutable state');
 
     await fixture();
-    await write(join(temporary, 'CONTRIBUTING.md'), 'mise run missing\n');
+    await write(join(temporary, 'README.md'), `${readme()}\nmise run missing\n`);
     await expect(validateDocumentation(temporary)).rejects.toThrow('unknown mise task');
 
     await fixture();
