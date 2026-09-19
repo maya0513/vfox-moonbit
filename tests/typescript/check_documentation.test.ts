@@ -14,8 +14,10 @@ import {
 } from '../../scripts/check_documentation.ts';
 
 const VERSION = '0.1.3';
-const TOOL_SPEC = '"vfox:maya0513/vfox-moonbit" = "latest"';
+const PROJECT_TOOL_SPEC = "mise use 'vfox:maya0513/vfox-moonbit@latest'";
+const PROJECT_CONFIG_SPEC = '"vfox:maya0513/vfox-moonbit" = "latest"';
 const RELEASE_URL = `https://github.com/maya0513/vfox-moonbit/releases/download/v${VERSION}/vfox-moonbit-${VERSION}.zip`;
+const OVERLAY_REVISION = 'edbca0874797c2ee227d4f9cc2b427747756717c';
 let temporary: string;
 
 async function write(path: string, content: string): Promise<void> {
@@ -24,7 +26,7 @@ async function write(path: string, content: string): Promise<void> {
 }
 
 function readme(extra = ''): string {
-  return `${TOOL_SPEC}\n${RELEASE_URL}\nmise 2026.9.2\nvfox 1.0.12\nMOON_TOOLCHAIN_ROOT\nMOON_HOME\n${extra}`;
+  return `${PROJECT_TOOL_SPEC}\nmoon version\n${PROJECT_CONFIG_SPEC}\nmise install\nmoon version\n${RELEASE_URL}\nmise 2026.9.2\nvfox 1.0.12\nMOON_TOOLCHAIN_ROOT\nMOON_HOME\n${extra}`;
 }
 
 async function fixture(): Promise<void> {
@@ -37,7 +39,7 @@ async function fixture(): Promise<void> {
         'PLUGIN.name = "moonbit"',
         `PLUGIN.version = "${VERSION}"`,
         'PLUGIN.homepage = "https://github.com/maya0513/vfox-moonbit"',
-        'PLUGIN.license = "Apache-2.0"',
+        'PLUGIN.license = "MIT"',
         'PLUGIN.description = "test"',
         'PLUGIN.minRuntimeVersion = "1.0.12"',
         'PLUGIN.manifestUrl = "https://github.com/maya0513/vfox-moonbit/releases/download/manifest/manifest.json"',
@@ -53,9 +55,12 @@ async function fixture(): Promise<void> {
     write(join(temporary, 'SECURITY.md'), 'Security\n'),
     write(
       join(temporary, 'docs', 'ARCHITECTURE.md'),
-      'linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\n',
+      `linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\n${OVERLAY_REVISION}\nLLVM bundle\n`,
     ),
-    write(join(temporary, 'docs', 'REPOSITORY_SETTINGS.md'), 'Settings\n'),
+    write(
+      join(temporary, 'docs', 'ARCHITECTURE.ja.md'),
+      `linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\n${OVERLAY_REVISION}\nLLVM bundle\n`,
+    ),
   ]);
 }
 
@@ -100,6 +105,29 @@ describe('documentation checker', () => {
     await fixture();
     await write(join(temporary, 'README.md'), readme('[missing](absent.md)'));
     await expect(validateDocumentation(temporary)).rejects.toThrow('missing local path');
+
+    await fixture();
+    await write(
+      join(temporary, 'README.md'),
+      readme().replace('moon version\n', 'moon version --all --json --no-path\n'),
+    );
+    await expect(validateDocumentation(temporary)).rejects.toThrow('machine-only version probe');
+
+    await fixture();
+    await write(
+      join(temporary, 'docs', 'ARCHITECTURE.md'),
+      'linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\nLLVM bundle\n',
+    );
+    await expect(validateDocumentation(temporary)).rejects.toThrow('comparison revision');
+
+    await fixture();
+    await write(
+      join(temporary, 'docs', 'ARCHITECTURE.ja.md'),
+      `${OVERLAY_REVISION}\nLLVM bundle\n`,
+    );
+    await expect(validateDocumentation(temporary)).rejects.toThrow(
+      'docs/ARCHITECTURE.ja.md platform',
+    );
   });
 
   it('rejects malformed source configuration and arguments', async () => {

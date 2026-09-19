@@ -218,6 +218,32 @@ describe("MoonBit toolchain preparation", function()
         assert.equals(2, closed)
     end)
 
+    it("uses the official stable core bundle recipe without LLVM", function()
+        local commands = {}
+        local runtime = {
+            join = Runtime.join,
+            quote_unix = Runtime.quote_unix,
+            make_dir = function() end,
+            remove_tree = function() end,
+            run = function(command)
+                commands[#commands + 1] = command
+            end,
+        }
+        local toolchain = Toolchain.new({
+            runtime = runtime,
+            getenv = function()
+                return "/usr/bin:/bin"
+            end,
+        })
+
+        toolchain:bundle("/root", "linux")
+
+        assert.equals(2, #commands)
+        assert.is_truthy(commands[1]:find("'bundle' '--warn-list' '-a' '--all'", 1, true))
+        assert.is_truthy(commands[2]:find("'bundle' '--warn-list' '-a' '--target' 'wasm-gc' '--quiet'", 1, true))
+        assert.is_nil(table.concat(commands, "\n"):find("llvm", 1, true))
+    end)
+
     it("cleans the temporary home when bundling or cleanup fails", function()
         local function runtime_with_cleanup(remove_tree)
             return {

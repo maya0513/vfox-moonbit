@@ -23,6 +23,7 @@ import {
   executableName,
   HELPER_EXECUTABLES,
   main,
+  miseActivationCommand,
   parseArguments,
   pathsReferToSameEntry,
   preparePlugin,
@@ -200,5 +201,19 @@ describe('E2E helper invariants', () => {
     await expect(main(['--repo', REPOSITORY, '--backend', 'vfox'])).resolves.toBe(2);
     if (previousCi === undefined) delete process.env.CI;
     else process.env.CI = previousCi;
+  });
+
+  it('builds fresh-shell activation commands without mise exec', () => {
+    const unix = miseActivationCommand('linux');
+    expect(unix.slice(0, 3)).toEqual(['bash', '--noprofile', '--norc']);
+    expect(unix.join(' ')).toContain('mise activate bash');
+    expect(unix.join(' ')).toContain('moon version');
+    expect(unix.join(' ')).not.toContain('mise exec');
+
+    const windows = miseActivationCommand('win32');
+    expect(windows[0]).toBe('pwsh');
+    expect(windows.join(' ')).toContain('mise activate pwsh');
+    expect(windows.join(' ')).toContain('moon.exe version');
+    expect(windows.join(' ')).not.toContain('mise exec');
   });
 });

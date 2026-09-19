@@ -81,7 +81,9 @@ describe("vfox hooks", function()
             { key = "PATH", value = "/root/bin" },
             { key = "MOON_TOOLCHAIN_ROOT", value = "/root" },
         }, direct)
-        assert.is_nil(direct.MOON_HOME)
+        for _, entry in ipairs(direct) do
+            assert.not_equals("MOON_HOME", entry.key)
+        end
         local fallback = plugin:EnvKeys({})
         assert.equals("/fallback", fallback[3].value)
     end)

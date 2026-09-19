@@ -1,6 +1,7 @@
 {
   "name": "vfox-moonbit-maintenance",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@types/node": "24.13.5",

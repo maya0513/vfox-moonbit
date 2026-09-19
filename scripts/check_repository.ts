@@ -61,8 +61,8 @@ export async function checkOwner(repository: string): Promise<void> {
   const homepage = `https://github.com/${EXPECTED_REPOSITORY}`;
   if (metadata.homepage !== homepage)
     throw new RepositoryError(`metadata homepage must be ${homepage}`);
-  if (metadata.license !== 'Apache-2.0') {
-    throw new RepositoryError('metadata license must use the Apache-2.0 SPDX identifier');
+  if (metadata.license !== 'MIT') {
+    throw new RepositoryError('metadata license must use the MIT SPDX identifier');
   }
   if (metadata.manifestUrl !== `${homepage}/releases/download/manifest/manifest.json`) {
     throw new RepositoryError('metadata manifestUrl does not use the canonical repository');
