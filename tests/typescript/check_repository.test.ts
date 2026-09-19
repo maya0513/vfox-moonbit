@@ -116,7 +116,7 @@ describe('ownership and runtime policy', () => {
     await expect(checkOwner(root)).rejects.toThrow('homepage');
     await writeFile(
       metadata,
-      original.replace('PLUGIN.license = "Apache-2.0"', 'PLUGIN.license = "custom"'),
+      original.replace('PLUGIN.license = "MIT"', 'PLUGIN.license = "custom"'),
     );
     await expect(checkOwner(root)).rejects.toThrow('SPDX');
     await writeFile(metadata, original.replace('releases/download/manifest', 'wrong/manifest'));

@@ -362,6 +362,63 @@ function sameFingerprint(left: Fingerprint, right: Fingerprint): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+export function miseActivationCommand(platform = process.platform): string[] {
+  if (platform === 'win32') {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      'mise activate pwsh | Out-String | Invoke-Expression',
+      'moon.exe version',
+      'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+      'Write-Output "E2E_MOON_HOME=$env:MOON_HOME"',
+      'Write-Output "E2E_TOOLCHAIN_ROOT=$env:MOON_TOOLCHAIN_ROOT"',
+    ].join('; ');
+    return ['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script];
+  }
+  const script = [
+    'set -e',
+    'eval "$(mise activate bash)"',
+    'moon version',
+    `printf 'E2E_MOON_HOME=%s\\n' "$MOON_HOME"`,
+    `printf 'E2E_TOOLCHAIN_ROOT=%s\\n' "$MOON_TOOLCHAIN_ROOT"`,
+  ].join('\n');
+  return ['bash', '--noprofile', '--norc', '-c', script];
+}
+
+function outputMarker(stdout: string, name: string): string {
+  const prefix = `${name}=`;
+  const line = stdout.split(/\r?\n/).find((candidate) => candidate.startsWith(prefix));
+  if (line === undefined) throw new E2EError(`activated mise shell did not export ${name}`);
+  return line.slice(prefix.length);
+}
+
+export async function validateMiseActivation(
+  root: string,
+  version: string,
+  options: { workspace: string; env: NodeJS.ProcessEnv },
+): Promise<void> {
+  const project = join(options.workspace, 'mise activated project');
+  await mkdir(project, { recursive: true });
+  await writeFile(join(project, 'mise.toml'), `[tools]\nmoonbit = "${version}"\n`, 'utf8');
+  const result = await run(miseActivationCommand(), {
+    cwd: project,
+    env: options.env,
+  });
+  if (!/^moon\s/m.test(result.stdout)) {
+    throw new E2EError('moon version did not run directly in the activated mise shell');
+  }
+  const expectedHome = options.env.MOON_HOME;
+  if (
+    expectedHome === undefined ||
+    normalizedPath(outputMarker(result.stdout, 'E2E_MOON_HOME')) !== normalizedPath(expectedHome)
+  ) {
+    throw new E2EError("mise shell activation overwrote the caller's mutable MOON_HOME");
+  }
+  const activatedRoot = outputMarker(result.stdout, 'E2E_TOOLCHAIN_ROOT');
+  if (!(await pathsReferToSameEntry(activatedRoot, root))) {
+    throw new E2EError('mise shell activation did not export the exact install root');
+  }
+}
+
 export async function validateCommands(
   prefix: readonly string[],
   root: string,
@@ -497,6 +554,7 @@ export async function runMise(
     })
   ).stdout.trim();
   await validateInstall(root, version);
+  await validateMiseActivation(root, version, options);
   await validateCommands(
     ['mise', '--no-config', 'exec', `moonbit@${version}`, '--'],
     root,

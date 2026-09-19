@@ -69,35 +69,55 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     'CONTRIBUTING.md',
     'SECURITY.md',
     'docs/ARCHITECTURE.md',
-    'docs/REPOSITORY_SETTINGS.md',
+    'docs/ARCHITECTURE.ja.md',
   ] as const;
-  const [metadata, mise, readme, readmeJa, contributing, architecture] = await Promise.all([
-    parseMetadata(join(repository, 'metadata.lua')),
-    readFile(join(repository, 'mise.toml'), 'utf8'),
-    readFile(join(repository, 'README.md'), 'utf8'),
-    readFile(join(repository, 'README.ja.md'), 'utf8'),
-    readFile(join(repository, 'CONTRIBUTING.md'), 'utf8'),
-    readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
-  ]);
+  const [metadata, mise, readme, readmeJa, contributing, architecture, architectureJa] =
+    await Promise.all([
+      parseMetadata(join(repository, 'metadata.lua')),
+      readFile(join(repository, 'mise.toml'), 'utf8'),
+      readFile(join(repository, 'README.md'), 'utf8'),
+      readFile(join(repository, 'README.ja.md'), 'utf8'),
+      readFile(join(repository, 'CONTRIBUTING.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
+    ]);
   const pluginVersion = metadata.version;
   if (typeof pluginVersion !== 'string') throw new DocumentationError('plugin version is missing');
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
   const vfoxVersion = capture(mise, /^vfox\s*=\s*"([^"]+)"$/m, 'vfox version');
-  const toolSpec = `"vfox:${EXPECTED_REPOSITORY}" = "latest"`;
+  const projectToolSpec = `mise use 'vfox:${EXPECTED_REPOSITORY}@latest'`;
+  const projectConfigSpec = `"vfox:${EXPECTED_REPOSITORY}" = "latest"`;
   const releaseUrl = `https://github.com/${EXPECTED_REPOSITORY}/releases/download/v${pluginVersion}/vfox-moonbit-${pluginVersion}.zip`;
   for (const [name, document] of [
     ['README.md', readme],
     ['README.ja.md', readmeJa],
   ] as const) {
-    requireText(document, toolSpec, `${name} mise tool specification`);
+    requireText(document, projectToolSpec, `${name} project mise usage`);
+    requireText(document, projectConfigSpec, `${name} mise.toml tool specification`);
     requireText(document, releaseUrl, `${name} standalone vfox release URL`);
     requireText(document, miseVersion, `${name} tested mise version`);
     requireText(document, vfoxVersion, `${name} tested vfox version`);
     requireText(document, 'MOON_TOOLCHAIN_ROOT', `${name} toolchain environment`);
     requireText(document, 'MOON_HOME', `${name} mutable state environment`);
+    requireText(document, `${projectToolSpec}\nmoon version`, `${name} direct MoonBit quick start`);
+    requireText(document, 'mise install\nmoon version', `${name} mise.toml installation`);
+    if (document.includes('moon version --all --json --no-path')) {
+      throw new DocumentationError(`${name} exposes the machine-only version probe`);
+    }
   }
-  for (const platform of ['linux-x86_64', 'linux-aarch64', 'darwin-aarch64', 'windows-x86_64']) {
-    requireText(architecture, platform, `architecture platform ${platform}`);
+  for (const [name, document] of [
+    ['docs/ARCHITECTURE.md', architecture],
+    ['docs/ARCHITECTURE.ja.md', architectureJa],
+  ] as const) {
+    requireText(
+      document,
+      'edbca0874797c2ee227d4f9cc2b427747756717c',
+      `${name} moonbit-overlay comparison revision`,
+    );
+    requireText(document, 'LLVM bundle', `${name} intentional LLVM bundle difference`);
+    for (const platform of ['linux-x86_64', 'linux-aarch64', 'darwin-aarch64', 'windows-x86_64']) {
+      requireText(document, platform, `${name} platform ${platform}`);
+    }
   }
   const availableTasks = miseTasks(mise);
   for (const task of documentedTasks(`${readme}\n${readmeJa}\n${contributing}`)) {
