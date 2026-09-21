@@ -23,7 +23,7 @@ const APPROVED_DEV_DEPENDENCIES = {
   '@types/yazl': '3.3.1',
   '@vitest/coverage-v8': '4.1.11',
   tar: '7.5.22',
-  'vite-plus': '0.3.2',
+  'vite-plus': '0.3.3',
   yauzl: '3.4.0',
   yazl: '3.3.1',
 } as const;
@@ -307,7 +307,7 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   const requiredWorkspaceSettings = [
     "  - '.'",
     'storeDir: .pnpm-store',
-    "  'vite@*': 'npm:@voidzero-dev/vite-plus-core@0.3.2'",
+    "  'vite@*': 'npm:@voidzero-dev/vite-plus-core@0.3.3'",
     "  'vitest@*': '4.1.11'",
   ];
   if (requiredWorkspaceSettings.some((setting) => !workspace.includes(setting))) {
