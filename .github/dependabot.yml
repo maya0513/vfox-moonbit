@@ -17,3 +17,8 @@ updates:
       time: "03:30"
       timezone: Asia/Tokyo
     open-pull-requests-limit: 5
+    ignore:
+      # Keep Node.js type definitions on the same major as the pinned runtime.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
