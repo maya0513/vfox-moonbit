@@ -9,7 +9,7 @@
     "@types/yazl": "3.3.1",
     "@vitest/coverage-v8": "4.1.11",
     "tar": "7.5.22",
-    "vite-plus": "0.3.2",
+    "vite-plus": "0.3.3",
     "yauzl": "3.4.0",
     "yazl": "3.3.1"
   },
