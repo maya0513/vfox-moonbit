@@ -72,11 +72,33 @@ scheduled GitHub Actions workflowは1日1回実行します。GitHub App token�
 
 ## 開発・保守用ツール
 
-`mise run coverage`では、自作Lua runtimeの各fileの行カバレッジと、保守用TypeScriptの各fileの文・分岐・関数・行カバレッジを100%に保ちます。Lua checkerは表示された割合に加えて実行・未実行行数を確認し、丸めによる未実行行の見逃しを防ぎます。vendorのSHA実装と実ダウンロードを行うE2E harnessは従来どおり別途検証します。テストはローカルのarchive fixtureとI/O障害の注入を使い、危険なpath、downloadの上限、後始末、manifestの不変性、packageの再現性をupstreamへの通信なしで検証します。
+`pnpm vp run coverage`では、自作Lua runtimeの各fileの行カバレッジと、保守用TypeScriptの各fileの文・分岐・関数・行カバレッジを100%に保ちます。Lua checkerは表示された割合に加えて実行・未実行行数を確認し、丸めによる未実行行の見逃しを防ぎます。vendorのSHA実装と実ダウンロードを行うE2E harnessは従来どおり別途検証します。テストはローカルのarchive fixtureとI/O障害の注入を使い、危険なpath、downloadの上限、後始末、manifestの不変性、packageの再現性をupstreamへの通信なしで検証します。
 
 保守用のTypeScript CLIは、Node 24の型除去機能により事前のtranspileなしで直接実行します。Vite Taskはformat、lint、unit test、coverage、documentation検査、manifest検査、package作成の実行順序とcacheを管理します。cache対象のtaskでは入力fileからfingerprintを算出し、coverage結果と`dist`のpackageを生成物として復元します。networkや利用者のstateへ依存するE2E、upstream discovery、release操作はcacheの対象外です。
 
-miseはNode、pnpm、Lua、LuaRocks、workflow検査toolの互換version範囲を指定し、解決したversionをmise.lockへ記録します。npm依存は互換範囲とpnpm-lock.yamlを使い、Vite core・Vitest・coverage providerはVite+に合わせて一緒に更新します。GitHub Actionsはmajor tagへ追従します。週次のmaintenance updaterがtoolと依存のlockを1件のPRにまとめて更新し、個別のDependabot version更新PRを置き換えます。major更新には明示的な範囲変更が必要です。`mise run update:tooling`で同じ更新をローカル実行できます。開発者向けの入口は`mise run`へ統一し、各checkをVite Taskへ委譲します。repository checkerはowner、承認済みの依存範囲とworkflow参照、manifest、禁止されたPython関連fileの残存を検証します。documentation checkerはversion、command、platform、環境変数、local linkの記述を実装と照合します。
+miseはNode、pnpm、Lua、LuaRocks、workflow検査toolの互換version範囲を指定し、解決したversionをmise.lockへ記録します。npm依存は互換範囲とpnpm-lock.yamlを使い、Vite core・Vitest・coverage providerはVite+に合わせて一緒に更新します。GitHub Actionsはmajor tagへ追従します。週次のmaintenance updaterがtoolと依存のlockを1件のPRにまとめて更新し、個別のDependabot version更新PRを置き換えます。major更新には明示的な範囲変更が必要です。`mise run bootstrap`はproject-localのVite+ CLIが使える前にNodeとLuaの依存を準備し、`mise run update:tooling`はtoolchain自体を更新します。miseに残すtaskはこの2件だけです。check、package、E2E、upstream discoveryはVite Taskだけに定義し、`pnpm vp run <task>`で実行します。環境はローカルのmise shell activationとCIのmise-actionで準備し、通常のtask呼び出しに`mise exec`を挟みません。repository checkerはowner、承認済みの依存範囲とworkflow参照、manifest、禁止されたPython関連fileの残存を検証します。documentation checkerはversion、command、platform、環境変数、local linkの記述を実装と照合します。
+
+### 保守用コマンド
+
+miseをshellで有効にしてから実行します。Luaを含む開発用セットアップは現在Linux x86_64前提です。
+
+```shell
+mise install --locked
+mise run bootstrap
+pnpm vp run ci
+```
+
+| コマンド | 用途 |
+| --- | --- |
+| `mise run bootstrap` | npmの固定依存とLuaのテスト依存を準備 |
+| `mise run update:tooling` | 互換範囲内でtoolとnpm依存のlockを更新 |
+| `pnpm vp run fmt:check` / `pnpm vp run lint` | 整形と静的解析 |
+| `pnpm vp run test:unit` / `pnpm vp run coverage` | 単体テストと100%カバレッジ検証 |
+| `pnpm vp run docs:check` / `pnpm vp run update:check` | 文書とrelease manifestの検証 |
+| `pnpm vp run package` | 再現可能なプラグインpackageを生成 |
+| `pnpm vp run e2e` / `pnpm vp run e2e:vfox` | 実ダウンロードの統合テスト |
+| `pnpm vp run update:discover` | 完全なupstream MoonBit releaseを検出 |
+| `pnpm vp run ci` | 決定的な検証をまとめて実行。E2Eは別途実行 |
 
 ## moonbit-overlayとの比較
 

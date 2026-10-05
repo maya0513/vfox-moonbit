@@ -4,7 +4,7 @@
 
 ## Verification
 
-- [ ] `mise run ci`
+- [ ] `pnpm vp run ci`
 - [ ] Networked E2E, if runtime or release metadata changed
 - [ ] Documentation updated, if behavior changed
 - [ ] No existing exact release manifest was modified

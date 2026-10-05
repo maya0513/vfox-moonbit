@@ -20,42 +20,6 @@ zizmor = "1"
 description = "Install locked Node and Lua test dependencies"
 run = "bash scripts/bootstrap.sh"
 
-[tasks."fmt:check"]
-description = "Check Lua and TypeScript formatting"
-run = "pnpm exec vp run fmt:check"
-
-[tasks.lint]
-description = "Run static analysis and workflow security checks"
-run = "pnpm exec vp run lint"
-
-[tasks."test:unit"]
-description = "Run Lua 5.1 and TypeScript unit tests"
-run = "pnpm exec vp run test:unit"
-
-[tasks.coverage]
-description = "Enforce first-party Lua and TypeScript coverage at 100%"
-run = "pnpm exec vp run coverage"
-
-[tasks."docs:check"]
-description = "Check documentation against implementation facts"
-run = "pnpm exec vp run docs:check"
-
-[tasks.e2e]
-description = "Run the real-download MoonBit integration test through mise"
-run = "pnpm exec vp run e2e"
-
-[tasks.package]
-description = "Build a deterministic local plugin release bundle"
-run = "pnpm exec vp run package"
-
-[tasks."update:check"]
-description = "Validate immutable release manifests and vendored source"
-run = "pnpm exec vp run update:check"
-
-[tasks.ci]
-description = "Run the same deterministic checks as GitHub Actions"
-run = "pnpm exec vp run ci"
-
 [tasks."update:tooling"]
 description = "Update tool and dependency locks within the configured ranges"
 run = "bash scripts/update-tooling.sh"

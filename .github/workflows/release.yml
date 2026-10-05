@@ -42,14 +42,14 @@ jobs:
       - name: Bootstrap and verify release source
         run: |
           mise run bootstrap
-          mise run ci
-          pnpm exec vp exec node scripts/check_repository.ts --require-origin
+          pnpm vp run ci
+          node scripts/check_repository.ts --require-origin
 
       - name: Build deterministic release assets
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          pnpm exec vp run package --version "$version" --output dist
+          pnpm vp run package --version "$version" --output dist
 
       - name: Attest the plugin ZIP
         uses: actions/attest@v4 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.

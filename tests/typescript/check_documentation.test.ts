@@ -11,6 +11,7 @@ import {
   miseTasks,
   parseArguments,
   validateDocumentation,
+  viteTasks,
 } from '../../scripts/check_documentation.ts';
 import * as common from '../../scripts/lib/common.ts';
 
@@ -48,7 +49,11 @@ async function fixture(): Promise<void> {
     ),
     write(
       join(temporary, 'mise.toml'),
-      'min_version = "2026.9.2"\nvfox = "1.0.12"\n[tasks.ci]\nrun = "true"\n',
+      'min_version = "2026.9.2"\nvfox = "1.0.12"\n[tasks.bootstrap]\nrun = "true"\n',
+    ),
+    write(
+      join(temporary, 'vite.tasks.ts'),
+      "export const tasks = {\n  ci: { command: 'true' },\n};\n",
     ),
     write(join(temporary, 'README.md'), readme('[architecture](docs/ARCHITECTURE.md)')),
     write(join(temporary, 'README.ja.md'), readme()),
@@ -79,7 +84,12 @@ afterEach(async () => {
 describe('documentation checker', () => {
   it('extracts tasks and local links', () => {
     expect([...miseTasks('[tasks.ci]\n[tasks."fmt:check"]\n')]).toEqual(['ci', 'fmt:check']);
-    expect([...documentedTasks('mise run ci; mise run fmt:check')]).toEqual(['ci', 'fmt:check']);
+    expect([
+      ...viteTasks('  ci: {\n  \'fmt:check\': {\n  "docs:check": {\n    cache: {\n'),
+    ]).toEqual(['ci', 'fmt:check', 'docs:check']);
+    const commands = 'mise run bootstrap; pnpm vp run ci; pnpm vp run fmt:check';
+    expect([...documentedTasks(commands, 'mise')]).toEqual(['bootstrap']);
+    expect([...documentedTasks(commands, 'vite')]).toEqual(['ci', 'fmt:check']);
     expect(
       localLinks(
         '[local](docs/a.md#anchor) [angle](<docs/with space.md>) [web](https://example.com) [hash](#x)',
@@ -114,7 +124,7 @@ describe('documentation checker', () => {
   });
 
   it('accepts documentation derived from implementation facts', async () => {
-    await write(join(temporary, 'README.md'), readme('mise run ci'));
+    await write(join(temporary, 'README.md'), readme('mise run bootstrap; pnpm vp run ci'));
     await expect(validateDocumentation(temporary)).resolves.toBeUndefined();
     expect(parseArguments(['--repo', temporary])).toEqual({ repository: temporary });
     expect(parseArguments([]).repository).toBeTruthy();
@@ -125,6 +135,12 @@ describe('documentation checker', () => {
     ['README.md', readme().replace('MOON_HOME', 'USER_HOME'), 'mutable state'],
     ['README.ja.md', readme().replace('MOON_TOOLCHAIN_ROOT', 'USER_ROOT'), 'toolchain environment'],
     ['README.md', readme('mise run missing'), 'unknown mise task'],
+    ['README.md', readme('pnpm vp run missing'), 'unknown vite task'],
+    [
+      'docs/ARCHITECTURE.md',
+      `linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\n${OVERLAY_REVISION}\nLLVM bundle\npnpm vp run missing`,
+      'unknown vite task',
+    ],
     ['README.md', readme('[missing](absent.md)'), 'missing local path'],
     [
       'README.md',

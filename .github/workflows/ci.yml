@@ -79,7 +79,7 @@ jobs:
           restore-keys: vite-task-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Run deterministic CI suite
-        run: mise run ci
+        run: pnpm vp run ci
 
       - name: Save Vite Task cache
         if: success()
@@ -152,7 +152,7 @@ jobs:
       - name: Run real-download E2E through mise
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: pnpm exec vp run e2e
+        run: pnpm vp run e2e
 
   vfox_e2e:
     name: vfox-e2e (${{ matrix.os }}, vfox 1.x)
@@ -200,9 +200,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
-        run: >-
-          mise exec node pnpm vfox --
-          pnpm exec vp run e2e:vfox
+        run: pnpm vp run e2e:vfox
 
   required:
     name: required

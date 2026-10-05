@@ -26,9 +26,20 @@ export function miseTasks(text: string): Set<string> {
   return tasks;
 }
 
-export function documentedTasks(text: string): Set<string> {
+export function viteTasks(text: string): Set<string> {
   return new Set(
-    [...text.matchAll(/\bmise run ([A-Za-z0-9:.-]+)/g)].map((match) => String(match[1])),
+    [...text.matchAll(/^ {2}(?:'([^']+)'|"([^"]+)"|([A-Za-z][A-Za-z0-9:.-]*)):\s*\{/gm)].map(
+      (match) => String(match[1] ?? match[2] ?? match[3]),
+    ),
+  );
+}
+
+export function documentedTasks(text: string, runner: 'mise' | 'vite'): Set<string> {
+  const command = runner === 'mise' ? 'mise' : 'pnpm vp';
+  return new Set(
+    [...text.matchAll(new RegExp(`\\b${command} run ([A-Za-z0-9:.-]+)`, 'g'))].map((match) =>
+      String(match[1]),
+    ),
   );
 }
 
@@ -117,10 +128,22 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
       requireText(document, platform, `${name} platform ${platform}`);
     }
   }
-  const availableTasks = miseTasks(mise);
-  for (const task of documentedTasks(`${readme}\n${readmeJa}`)) {
-    if (!availableTasks.has(task))
-      throw new DocumentationError(`documentation uses unknown mise task: ${task}`);
+  const availableTasks = {
+    mise: miseTasks(mise),
+    vite: viteTasks(await readFile(join(repository, 'vite.tasks.ts'), 'utf8')),
+  };
+  const documents = [
+    readme,
+    readmeJa,
+    architecture,
+    architectureJa,
+    await readFile(join(repository, 'SECURITY.md'), 'utf8'),
+  ];
+  for (const runner of ['mise', 'vite'] as const) {
+    for (const task of documentedTasks(documents.join('\n'), runner)) {
+      if (!availableTasks[runner].has(task))
+        throw new DocumentationError(`documentation uses unknown ${runner} task: ${task}`);
+    }
   }
   await checkLinks(repository, documentNames);
 }
