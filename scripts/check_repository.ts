@@ -18,7 +18,7 @@ const REMOTE_RE = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(
 const FORBIDDEN_WORKFLOW_TOOL_RE =
   /\b(?:actions\/setup-python|python(?:3(?:\.\d+)?)?|uv|pytest|ruff)\b/i;
 const APPROVED_DEV_DEPENDENCIES = {
-  '@types/node': '24.13.5',
+  '@types/node': '24.19.0',
   '@types/yauzl': '3.4.0',
   '@types/yazl': '3.3.1',
   '@vitest/coverage-v8': '4.1.11',
