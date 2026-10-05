@@ -34,7 +34,7 @@ CIでは最新の安定版miseを使用します。対応するmiseの最低バ�
 GitHub Releaseからプラグインを追加します。
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.3/vfox-moonbit-0.1.3.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.4/vfox-moonbit-0.1.4.zip moonbit
 vfox install --yes moonbit@latest
 vfox use moonbit@latest
 moon version
