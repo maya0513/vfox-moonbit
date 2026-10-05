@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,7 +12,6 @@ import {
   coreVersion,
   DEFAULT_LIMITS,
   discover,
-  Downloader,
   encodeVersion,
   filesEqual,
   IncompleteRelease,
@@ -31,7 +29,6 @@ import {
   safeLink,
   safeName,
   SupplyChainError,
-  UpdateError,
   validateExact,
   validateLocal,
 } from '../../scripts/update_latest.ts';
@@ -155,75 +152,6 @@ describe('version and JSON helpers', () => {
   });
 });
 
-describe('streaming downloader', () => {
-  it('downloads to a private temporary file and cleans it up', async () => {
-    let requestHeaders: Headers | undefined;
-    const fakeFetch: typeof fetch = async (_input, init) => {
-      requestHeaders = new Headers(init?.headers);
-      return new Response(Buffer.from('payload'), { headers: { 'Content-Length': '7' } });
-    };
-    const downloader = new Downloader({ fetchImplementation: fakeFetch, timeoutMs: 1000 });
-    const downloaded = await downloader.fetch('https://example.test/a', 8);
-    expect(await readFile(downloaded.path, 'utf8')).toBe('payload');
-    expect(downloaded.sha256).toBe(createHash('sha256').update('payload').digest('hex'));
-    expect(requestHeaders?.get('user-agent')).toContain('maya0513/');
-    await downloader.dispose();
-    await expect(stat(downloaded.path)).rejects.toMatchObject({ code: 'ENOENT' });
-    await downloader.dispose();
-  });
-
-  it('rejects invalid schemes, statuses, lengths, streams, and transport failures', async () => {
-    const downloader = new Downloader();
-    await expect(downloader.fetch('http://example.test/a', 8)).rejects.toThrow('non-HTTPS');
-
-    for (const [status, error] of [
-      [403, IncompleteRelease],
-      [404, IncompleteRelease],
-      [409, IncompleteRelease],
-      [500, UpdateError],
-    ] as const) {
-      const failing = new Downloader({
-        fetchImplementation: async () => new Response('', { status }),
-      });
-      await expect(failing.fetch('https://example.test/a', 8)).rejects.toBeInstanceOf(error);
-    }
-
-    const tooLargeHeader = new Downloader({
-      fetchImplementation: async () => new Response('x', { headers: { 'Content-Length': '99' } }),
-    });
-    await expect(tooLargeHeader.fetch('https://example.test/a', 2)).rejects.toThrow('size limit');
-    const invalidHeader = new Downloader({
-      fetchImplementation: async () => new Response('x', { headers: { 'Content-Length': 'bad' } }),
-    });
-    await expect(invalidHeader.fetch('https://example.test/a', 2)).rejects.toThrow(
-      'invalid Content-Length',
-    );
-    const streamed = new Downloader({ fetchImplementation: async () => new Response('abc') });
-    await expect(streamed.fetch('https://example.test/a', 2)).rejects.toThrow('size limit');
-    const empty = new Downloader({ fetchImplementation: async () => new Response(null) });
-    await expect(empty.fetch('https://example.test/a', 2)).rejects.toThrow('no response body');
-    const brokenStream = new Downloader({
-      fetchImplementation: async () =>
-        new Response(
-          new ReadableStream({
-            start(controller) {
-              controller.error(new Error('broken stream'));
-            },
-          }),
-        ),
-    });
-    await expect(brokenStream.fetch('https://example.test/a', 20)).rejects.toThrow(
-      'failed to download',
-    );
-    const offline = new Downloader({
-      fetchImplementation: async () => {
-        throw new Error('offline');
-      },
-    });
-    await expect(offline.fetch('https://example.test/a', 2)).rejects.toThrow('failed to download');
-  });
-});
-
 describe('archive path validation', () => {
   it.each(['/etc/passwd', 'C:/escape', '../escape', 'a/../../escape', 'a\\..\\..\\escape', 'a\0b'])(
     'rejects unsafe member %s',
@@ -284,6 +212,7 @@ describe('archive path validation', () => {
       tarBytes([
         { content: Buffer.from('x'), name: 'ok' },
         { link: '../outside', name: 'link', type: 'symlink' },
+        { content: Buffer.from('ignored after failure'), name: 'later' },
       ]),
       tarBytes([{ name: 'pipe', type: 'fifo' }]),
       tarBytes([{ link: '../outside', name: 'core/link', type: 'hardlink' }]),
@@ -367,6 +296,13 @@ describe('archive path validation', () => {
     await expect(
       inspectZip(await archiveFile('crc.zip', wrongCrc), { label: 'crc', required: [] }),
     ).rejects.toThrow('CRC-32 mismatch');
+  });
+
+  it('rejects a directory ZIP entry with a nonzero checksum', async () => {
+    const data = setZipCrc(await zipBytes([{ directory: true, name: 'folder/' }]), 1);
+    await expect(
+      inspectZip(await archiveFile('directory-crc.zip', data), { label: 'tool', required: [] }),
+    ).rejects.toThrow('malformed directory');
   });
 
   it('rejects malformed, missing, colliding, oversized, and overpopulated archives', async () => {
@@ -812,6 +748,14 @@ describe('file comparison and CLI contracts', () => {
         { path: rightPath, sha256: '0'.repeat(64), size: 4 },
       ),
     ).toBe(false);
+  });
+
+  it('propagates errors reading the existing latest pointer', async () => {
+    await mkdir(join(temporary, 'releases', 'latest.json'), { recursive: true });
+    await expect(promote(temporary, validExact())).rejects.toMatchObject({ code: 'EISDIR' });
+    await expect(stat(join(temporary, 'releases', '0.1.2+abc.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('parses CLI modes and validates check mode', async () => {

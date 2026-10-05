@@ -27,7 +27,7 @@ mise install
 moon version
 ```
 
-CI currently tests with mise 2026.9.2.
+CI uses the latest stable mise; the minimum supported mise version is 2026.9.2.
 
 ### Standalone vfox
 
@@ -40,7 +40,7 @@ vfox use moonbit@latest
 moon version
 ```
 
-CI currently tests with vfox 1.0.12.
+CI tests the locked vfox 1.x release; the minimum supported vfox version is 1.0.12.
 
 ## Supported hosts
 

@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { ZipFile } from 'yazl';
+import { releaseFiles } from '../../scripts/package_plugin.ts';
 
 import {
   canonicalJson,
@@ -16,6 +18,17 @@ import {
   PLATFORMS,
   SupplyChainError,
 } from '../../scripts/update_latest.ts';
+
+export const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+
+export async function copyReleaseSource(destination: string): Promise<string> {
+  for (const source of await releaseFiles(REPOSITORY)) {
+    const target = join(destination, relative(REPOSITORY, source));
+    await mkdir(dirname(target), { recursive: true });
+    await copyFile(source, target);
+  }
+  return destination;
+}
 
 export function sha256(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');

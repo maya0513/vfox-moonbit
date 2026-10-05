@@ -1,23 +1,22 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import {
-  copyFile,
   lstat,
-  mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   unlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import * as yauzl from 'yauzl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { copyReleaseSource, REPOSITORY } from './fixtures.ts';
 
 import {
   build,
@@ -29,7 +28,6 @@ import {
   releaseFiles,
 } from '../../scripts/package_plugin.ts';
 
-const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PLUGIN_VERSION = '0.1.3';
 const execFileAsync = promisify(execFile);
 let temporary: string;
@@ -44,19 +42,11 @@ afterEach(async () => {
   await rm(temporary, { force: true, recursive: true });
 });
 
-async function copyReleaseSource(destination: string): Promise<string> {
-  for (const source of await releaseFiles(REPOSITORY)) {
-    const target = join(destination, relative(REPOSITORY, source));
-    await mkdir(dirname(target), { recursive: true });
-    await copyFile(source, target);
-  }
-  return destination;
-}
-
 interface ZipMetadata {
   names: string[];
   modes: number[];
   dates: Date[];
+  contents: Map<string, Buffer>;
 }
 
 function zipMetadata(path: string): Promise<ZipMetadata> {
@@ -69,14 +59,26 @@ function zipMetadata(path: string): Promise<ZipMetadata> {
       const names: string[] = [];
       const modes: number[] = [];
       const dates: Date[] = [];
+      const contents = new Map<string, Buffer>();
       archive.on('entry', (entry) => {
         names.push(entry.fileName);
         modes.push((entry.externalFileAttributes >>> 16) & 0o777);
         dates.push(entry.getLastModDate());
-        archive.readEntry();
+        archive.openReadStream(entry, (streamError, stream) => {
+          if (streamError !== null || stream === undefined) {
+            rejectZip(streamError ?? new Error('missing ZIP stream'));
+            return;
+          }
+          void (async () => {
+            const chunks: Buffer[] = [];
+            for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+            contents.set(entry.fileName, Buffer.concat(chunks));
+            archive.readEntry();
+          })().catch(rejectZip);
+        });
       });
       archive.once('error', rejectZip);
-      archive.once('end', () => resolveZip({ dates, modes, names }));
+      archive.once('end', () => resolveZip({ contents, dates, modes, names }));
       archive.readEntry();
     });
   });
@@ -147,13 +149,32 @@ describe('deterministic package output', () => {
       downloadUrl: `https://github.com/maya0513/vfox-moonbit/releases/download/v${PLUGIN_VERSION}/vfox-moonbit-${PLUGIN_VERSION}.zip`,
       minRuntimeVersion: '1.0.12',
     });
+  });
 
-    const metadata = await zipMetadata(first.archive);
-    expect(metadata.names).toEqual(metadata.names.toSorted());
-    expect(metadata.names).toContain('metadata.lua');
-    expect(metadata.names).toContain('hooks/post_install.lua');
-    expect(metadata.names).toContain('lib/sha2.lua');
-    expect(metadata.names).not.toContain('releases/latest.json');
+  it('packages every public file with unchanged bytes and reproducible metadata', async () => {
+    const { archive } = await build(REPOSITORY, join(temporary, 'contents'));
+    const metadata = await zipMetadata(archive);
+    // Derive the public package contract independently of releaseFiles/build.
+    const expectedNames = [
+      'LICENSE',
+      'README.md',
+      'README.ja.md',
+      'THIRD_PARTY_NOTICES',
+      'metadata.lua',
+      'vendor-lock.json',
+    ];
+    for (const directory of ['hooks', 'lib']) {
+      for (const name of await readdir(join(REPOSITORY, directory))) {
+        if (name.endsWith('.lua')) expectedNames.push(`${directory}/${name}`);
+      }
+    }
+    expect(metadata.names).toEqual(expectedNames.toSorted());
+    for (const name of expectedNames) {
+      // Buffer.equals compares large vendored files without object traversal.
+      expect(metadata.contents.get(name)?.equals(await readFile(join(REPOSITORY, name)))).toBe(
+        true,
+      );
+    }
     expect(new Set(metadata.modes)).toEqual(new Set([0o644]));
     expect(
       new Set(

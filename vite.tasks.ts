@@ -47,8 +47,10 @@ export const tasks = {
       "bash -c 'stylua --check metadata.lua hooks lib/moonbit_*.lua tests/lua'",
       'vp fmt --check',
     ],
-    input: [...luaSources, ...typescriptSources],
-    output: [],
+    cache: {
+      input: [...luaSources, ...typescriptSources],
+      output: [],
+    },
   },
   lint: {
     command: [
@@ -58,33 +60,45 @@ export const tasks = {
       'zizmor --pedantic .github/workflows',
       'node scripts/check_repository.ts',
     ],
-    input: repositoryPolicyInputs,
-    output: [],
+    cache: {
+      input: repositoryPolicyInputs,
+      output: [],
+    },
   },
   'test:unit': {
     command: 'bash scripts/test-unit.sh',
-    input: [...luaSources, ...typescriptSources, 'scripts/test-unit.sh'],
-    output: [],
+    cache: {
+      input: [...luaSources, ...typescriptSources, 'scripts/test-unit.sh'],
+      output: [],
+    },
   },
   coverage: {
     command: 'bash scripts/coverage.sh',
-    input: [...luaSources, ...typescriptSources, 'scripts/coverage.sh'],
-    output: ['coverage/**', 'luacov.report.out', 'luacov.stats.out'],
+    cache: {
+      input: [...luaSources, ...typescriptSources, 'scripts/coverage.sh'],
+      output: ['coverage/**', 'luacov.report.out', 'luacov.stats.out'],
+    },
   },
   'docs:check': {
     command: 'node scripts/check_documentation.ts',
-    input: repositoryPolicyInputs,
-    output: [],
+    cache: {
+      input: repositoryPolicyInputs,
+      output: [],
+    },
   },
   package: {
     command: 'node scripts/package_plugin.ts',
-    input: repositoryPolicyInputs,
-    output: ['dist/**'],
+    cache: {
+      input: repositoryPolicyInputs,
+      output: ['dist/**'],
+    },
   },
   'update:check': {
     command: 'node scripts/update_latest.ts --check',
-    input: repositoryPolicyInputs,
-    output: [],
+    cache: {
+      input: repositoryPolicyInputs,
+      output: [],
+    },
   },
   e2e: {
     command: 'node scripts/e2e.ts --backend mise',
@@ -98,6 +112,10 @@ export const tasks = {
     command: 'node scripts/update_latest.ts',
     cache: false,
   },
+  'update:tooling': {
+    command: 'bash scripts/update-tooling.sh',
+    cache: false,
+  },
   ci: {
     command: 'git diff --check',
     dependsOn: [
@@ -109,7 +127,9 @@ export const tasks = {
       'update:check',
       'package',
     ],
-    input: repositoryPolicyInputs,
-    output: [],
+    cache: {
+      input: repositoryPolicyInputs,
+      output: [],
+    },
   },
 };

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Validate repository ownership, supply-chain policy, and workflow pinning. */
+/** Validate repository ownership, supply-chain policy, and tool compatibility. */
 
 import { spawnSync } from 'node:child_process';
 import { lstat, readFile, readdir, stat } from 'node:fs/promises';
@@ -13,19 +13,20 @@ import { EXPECTED_REPOSITORY, OWNER, REPOSITORY } from './lib/project.ts';
 
 export { EXPECTED_REPOSITORY, OWNER, REPOSITORY };
 const ACTION_RE = /^\s*(?:-\s+)?uses:\s*([^\s#]+)/gm;
-const PINNED_ACTION_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/;
+const APPROVED_ACTION_RE =
+  /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@(?:[0-9a-f]{40}|v[1-9][0-9]*)$/;
 const REMOTE_RE = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(?:\.git)?$/;
 const FORBIDDEN_WORKFLOW_TOOL_RE =
   /\b(?:actions\/setup-python|python(?:3(?:\.\d+)?)?|uv|pytest|ruff)\b/i;
 const APPROVED_DEV_DEPENDENCIES = {
-  '@types/node': '24.19.0',
-  '@types/yauzl': '3.4.0',
-  '@types/yazl': '3.3.1',
-  '@vitest/coverage-v8': '4.1.11',
-  tar: '7.5.22',
-  'vite-plus': '0.3.3',
-  yauzl: '3.4.0',
-  yazl: '3.3.1',
+  '@types/node': 24,
+  '@types/yauzl': 3,
+  '@types/yazl': 3,
+  '@vitest/coverage-v8': 5,
+  tar: 7,
+  'vite-plus': 1,
+  yauzl: 3,
+  yazl: 3,
 } as const;
 
 export class RepositoryError extends Error {}
@@ -199,11 +200,10 @@ export async function checkActions(repository: string): Promise<void> {
   for (const path of workflows) {
     const text = await readFile(path, 'utf8');
     for (const match of text.matchAll(ACTION_RE)) {
-      const reference = match[1];
-      if (reference === undefined) continue;
-      if (!reference.startsWith('./') && !PINNED_ACTION_RE.test(reference)) {
+      const reference = String(match[1]);
+      if (!reference.startsWith('./') && !APPROVED_ACTION_RE.test(reference)) {
         throw new RepositoryError(
-          `GitHub Action is not pinned to a full commit SHA in ${path.split('/').at(-1)}: ${reference}`,
+          `GitHub Action must use a major tag or full commit SHA in ${path.split('/').at(-1)}: ${reference}`,
         );
       }
     }
@@ -282,37 +282,55 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   const devDependencies = isRecord(packageDocument.devDependencies)
     ? packageDocument.devDependencies
     : undefined;
+  const devEngines = isRecord(packageDocument.devEngines) ? packageDocument.devEngines : undefined;
+  const packageManager = isRecord(devEngines?.packageManager)
+    ? devEngines.packageManager
+    : undefined;
   if (
     packageDocument.private !== true ||
     packageDocument.version !== undefined ||
     packageDocument.type !== 'module' ||
-    engines?.node !== '24.21.0' ||
-    packageDocument.packageManager !== 'pnpm@12.4.2'
+    engines?.node !== '24.x' ||
+    packageDocument.packageManager !== undefined ||
+    packageManager?.name !== 'pnpm' ||
+    packageManager.version !== '12.x' ||
+    packageManager.onFail !== 'download'
   ) {
     throw new RepositoryError(
-      'package.json must pin the approved Node.js and pnpm toolchain and remain private and unversioned',
+      'package.json must declare the approved Node.js and pnpm ranges and remain private and unversioned',
     );
   }
+  const coverageVersion = devDependencies?.['@vitest/coverage-v8'];
   if (
     devDependencies === undefined ||
+    typeof coverageVersion !== 'string' ||
     Object.keys(devDependencies).length !== Object.keys(APPROVED_DEV_DEPENDENCIES).length ||
-    Object.entries(APPROVED_DEV_DEPENDENCIES).some(
-      ([name, version]) => devDependencies[name] !== version,
-    )
+    Object.entries(APPROVED_DEV_DEPENDENCIES).some(([name, major]) => {
+      const version = devDependencies[name];
+      const prefix = name === '@vitest/coverage-v8' ? '' : '\\^';
+      return (
+        typeof version !== 'string' ||
+        !new RegExp(`^${prefix}${major}\\.\\d+\\.\\d+$`).test(version)
+      );
+    })
   ) {
-    throw new RepositoryError('package.json must exactly pin the approved maintenance packages');
+    throw new RepositoryError(
+      'package.json must use compatible ranges for the approved maintenance packages',
+    );
   }
 
   const workspace = await readFile(join(repository, 'pnpm-workspace.yaml'), 'utf8');
   const requiredWorkspaceSettings = [
     "  - '.'",
     'storeDir: .pnpm-store',
-    "  'vite@*': 'npm:@voidzero-dev/vite-plus-core@0.3.3'",
-    "  'vitest@*': '4.1.11'",
+    `  'vitest@*': '${coverageVersion}'`,
   ];
-  if (requiredWorkspaceSettings.some((setting) => !workspace.includes(setting))) {
+  if (
+    requiredWorkspaceSettings.some((setting) => !workspace.includes(setting)) ||
+    !/^  'vite@\*': 'npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+'$/m.test(workspace)
+  ) {
     throw new RepositoryError(
-      'pnpm workspace must pin the approved store and Vite/Vitest overrides',
+      'pnpm workspace must configure the approved store and aligned Vite/Vitest overrides',
     );
   }
 
@@ -339,8 +357,8 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   }
 
   const mise = await readFile(join(repository, 'mise.toml'), 'utf8');
-  if (!/^node\s*=\s*"24\.21\.0"$/m.test(mise) || !/^pnpm\s*=\s*"12\.4\.2"$/m.test(mise)) {
-    throw new RepositoryError('mise.toml must pin the approved Node.js and pnpm versions');
+  if (!/^node\s*=\s*"24"$/m.test(mise) || !/^pnpm\s*=\s*"12"$/m.test(mise)) {
+    throw new RepositoryError('mise.toml must select the approved Node.js and pnpm major versions');
   }
   for (const task of [
     'fmt:check',
@@ -367,8 +385,8 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   ) {
     throw new RepositoryError('Vite+ configuration must enable and import the cached task graph');
   }
-  if ((viteTasks.match(/cache: false/g) ?? []).length !== 3) {
-    throw new RepositoryError('only E2E and upstream discovery Vite+ tasks may disable caching');
+  if ((viteTasks.match(/cache: false/g) ?? []).length !== 4) {
+    throw new RepositoryError('only E2E and dependency discovery Vite+ tasks may disable caching');
   }
 
   const ciWorkflow = await readFile(join(repository, '.github', 'workflows', 'ci.yml'), 'utf8');

@@ -27,7 +27,7 @@ mise install
 moon version
 ```
 
-CIで現在確認しているmiseは2026.9.2です。
+CIでは最新の安定版miseを使用します。対応するmiseの最低バージョンは2026.9.2です。
 
 ### standalone vfox
 
@@ -40,7 +40,7 @@ vfox use moonbit@latest
 moon version
 ```
 
-CIで現在確認しているvfoxは1.0.12です。
+CIではロック済みのvfox 1.xを確認します。対応するvfoxの最低バージョンは1.0.12です。
 
 ## 対応host
 

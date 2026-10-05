@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -43,10 +43,9 @@ jobs:
             fi
           done < <(git diff --name-only "$BASE_SHA" -- releases)
 
-      - name: Install pinned development tools
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+      - name: Install configured development tools
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: false
           cache: false
           experimental: true
@@ -62,7 +61,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -73,7 +72,7 @@ jobs:
 
       - name: Restore Vite Task cache
         id: vite-task-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: node_modules/.vite/task-cache
           key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -84,25 +83,24 @@ jobs:
 
       - name: Save Vite Task cache
         if: success()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/save@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   mise_lock:
-    name: mise-lock (mise 2026.9.2)
+    name: mise-lock (mise latest)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           persist-credentials: false
 
       - name: Install mise under test
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: false
           cache: false
           experimental: true
@@ -111,7 +109,7 @@ jobs:
         run: mise install --locked --dry-run
 
   mise_e2e:
-    name: mise-e2e (${{ matrix.os }}, mise 2026.9.2)
+    name: mise-e2e (${{ matrix.os }}, mise latest)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -120,22 +118,21 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           persist-credentials: false
 
       - name: Install mise under test
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: false
           cache: false
           experimental: true
 
-      - name: Install pinned E2E Node toolchain
+      - name: Install configured E2E Node toolchain
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: mise install --locked node@24.21.0 pnpm@12.4.2
+        run: mise install --locked node pnpm
 
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -143,7 +140,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -158,7 +155,7 @@ jobs:
         run: pnpm exec vp run e2e
 
   vfox_e2e:
-    name: vfox-e2e (${{ matrix.os }}, vfox 1.0.12)
+    name: vfox-e2e (${{ matrix.os }}, vfox 1.x)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -167,22 +164,21 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           persist-credentials: false
 
       - name: Install mise bootstrapper
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: false
           cache: false
 
-      - name: Install pinned E2E tools
+      - name: Install configured E2E tools
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
-        run: mise install --locked node@24.21.0 pnpm@12.4.2 vfox@1.0.12
+        run: mise install --locked node pnpm vfox
 
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -190,7 +186,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -205,7 +201,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: >-
-          mise exec node@24.21.0 pnpm@12.4.2 vfox@1.0.12 --
+          mise exec node pnpm vfox --
           pnpm exec vp run e2e:vfox
 
   required:

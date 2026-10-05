@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mise lock --bump --platform linux-x64,linux-arm64 conda:gcc conda:lua conda:luarocks
+mise lock --bump --platform linux-x64,linux-arm64,macos-arm64,windows-x64 \
+  actionlint node pnpm shellcheck stylua vfox zizmor
+mise install --locked node pnpm
+pnpm_range="$(mise exec node -- node -p 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8")).devEngines.packageManager.version')"
+mise exec node pnpm -- pnpm self-update --yes "$pnpm_range"
+# self-update narrows the package-manager range; retain the declared policy.
+PNPM_RANGE="$pnpm_range" mise exec node -- node --input-type=module <<'NODE'
+import { readFileSync, writeFileSync } from 'node:fs';
+const path = 'package.json';
+const document = JSON.parse(readFileSync(path, 'utf8'));
+document.devEngines.packageManager.version = process.env.PNPM_RANGE;
+delete document.packageManager;
+writeFileSync(path, JSON.stringify(document, null, 2) + '\n');
+NODE
+mise exec node pnpm -- pnpm update --no-save
+
+# Vite+ ships a specific Vite core and Vitest runner. Update their overrides
+# and coverage provider together instead of independently upgrading the runner.
+mise exec node -- node --input-type=module <<'NODE'
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const tooling = JSON.parse(readFileSync('node_modules/vite-plus/package.json', 'utf8'));
+const vitest = tooling.dependencies.vitest;
+const vite = tooling.dependencies.vite;
+if (!/^5\.\d+\.\d+$/.test(vitest) || !/^npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+$/.test(vite)) {
+  throw new Error('Vite+ changed its toolchain majors; review compatibility before updating');
+}
+
+const packagePath = 'package.json';
+const document = JSON.parse(readFileSync(packagePath, 'utf8'));
+document.devDependencies['@vitest/coverage-v8'] = vitest;
+writeFileSync(packagePath, JSON.stringify(document, null, 2) + '\n');
+
+const workspacePath = 'pnpm-workspace.yaml';
+const workspace = readFileSync(workspacePath, 'utf8');
+const corePattern = /^  'vite@\*': '[^']+'$/m;
+const testPattern = /^  'vitest@\*': '[^']+'$/m;
+if (!corePattern.test(workspace) || !testPattern.test(workspace)) {
+  throw new Error('Vite/Vitest override declarations are missing');
+}
+writeFileSync(workspacePath, workspace
+  .replace(corePattern, `  'vite@*': '${vite}'`)
+  .replace(testPattern, `  'vitest@*': '${vitest}'`));
+NODE
+
+mise exec node pnpm -- pnpm install --no-frozen-lockfile
+mise exec node pnpm -- pnpm exec vp fmt package.json pnpm-workspace.yaml
+mise exec node -- node scripts/check_repository.ts
+git diff --check

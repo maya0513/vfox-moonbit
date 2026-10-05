@@ -22,16 +22,15 @@ jobs:
       issues: write # Open deduplicated maintenance issues with GITHUB_TOKEN.
     steps:
       - name: Check out main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install pinned Node toolchain
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+      - name: Install configured Node toolchain
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: true
           install_args: node pnpm
           cache: false
@@ -43,7 +42,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -103,7 +102,7 @@ jobs:
 
       - name: Persist partial-publish state
         if: steps.discover.outputs.incomplete == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           name: moonbit-partial-state
           path: ${{ runner.temp }}/moonbit-partial-state/first-seen-epoch
@@ -169,7 +168,7 @@ jobs:
       - name: Create repository-scoped GitHub App token
         if: steps.discover.outputs.manual_review == 'true' || steps.diff.outputs.changed == 'true'
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@v3 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}
           private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}

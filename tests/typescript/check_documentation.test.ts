@@ -12,6 +12,7 @@ import {
   parseArguments,
   validateDocumentation,
 } from '../../scripts/check_documentation.ts';
+import * as common from '../../scripts/lib/common.ts';
 
 const VERSION = '0.1.3';
 const PROJECT_TOOL_SPEC = "mise use 'vfox:maya0513/vfox-moonbit@latest'";
@@ -81,52 +82,68 @@ describe('documentation checker', () => {
     expect([...documentedTasks('mise run ci; mise run fmt:check')]).toEqual(['ci', 'fmt:check']);
     expect(
       localLinks(
-        '[local](docs/a.md) [angle](<docs/with space.md>) [web](https://example.com) [hash](#x)',
+        '[local](docs/a.md#anchor) [angle](<docs/with space.md>) [web](https://example.com) [hash](#x)',
       ),
     ).toEqual(['docs/a.md', 'docs/with space.md']);
   });
 
+  it('accepts the configured major vfox series', async () => {
+    await write(join(temporary, 'mise.toml'), 'min_version = "2026.9.2"\nvfox = "1"\n');
+    for (const name of ['README.md', 'README.ja.md']) {
+      await write(join(temporary, name), readme().replace('vfox 1.0.12', 'vfox 1.x'));
+    }
+    await expect(validateDocumentation(temporary)).resolves.toBeUndefined();
+  });
+
+  it('runs the process entrypoint using the default repository', async () => {
+    const exitCode = process.exitCode;
+    const argv = process.argv;
+    try {
+      process.argv = [process.execPath, 'check_documentation.ts'];
+      vi.doMock('../../scripts/lib/common.ts', () => ({ ...common, isMain: () => true }));
+      vi.resetModules();
+      await import('../../scripts/check_documentation.ts');
+      expect(process.exitCode).toBe(0);
+      expect(console.log).toHaveBeenCalledWith('documentation matches implementation facts');
+    } finally {
+      process.argv = argv;
+      process.exitCode = exitCode;
+      vi.doUnmock('../../scripts/lib/common.ts');
+      vi.resetModules();
+    }
+  });
+
   it('accepts documentation derived from implementation facts', async () => {
+    await write(join(temporary, 'README.md'), readme('mise run ci'));
     await expect(validateDocumentation(temporary)).resolves.toBeUndefined();
     expect(parseArguments(['--repo', temporary])).toEqual({ repository: temporary });
     expect(parseArguments([]).repository).toBeTruthy();
     await expect(main(['--repo', temporary])).resolves.toBe(0);
   });
 
-  it('rejects missing facts, unknown tasks, and broken links', async () => {
-    await write(join(temporary, 'README.md'), readme().replace('MOON_HOME', 'USER_HOME'));
-    await expect(validateDocumentation(temporary)).rejects.toThrow('mutable state');
-
-    await fixture();
-    await write(join(temporary, 'README.md'), `${readme()}\nmise run missing\n`);
-    await expect(validateDocumentation(temporary)).rejects.toThrow('unknown mise task');
-
-    await fixture();
-    await write(join(temporary, 'README.md'), readme('[missing](absent.md)'));
-    await expect(validateDocumentation(temporary)).rejects.toThrow('missing local path');
-
-    await fixture();
-    await write(
-      join(temporary, 'README.md'),
+  it.each([
+    ['README.md', readme().replace('MOON_HOME', 'USER_HOME'), 'mutable state'],
+    ['README.ja.md', readme().replace('MOON_TOOLCHAIN_ROOT', 'USER_ROOT'), 'toolchain environment'],
+    ['README.md', readme('mise run missing'), 'unknown mise task'],
+    ['README.md', readme('[missing](absent.md)'), 'missing local path'],
+    [
+      'README.md',
       readme().replace('moon version\n', 'moon version --all --json --no-path\n'),
-    );
-    await expect(validateDocumentation(temporary)).rejects.toThrow('machine-only version probe');
-
-    await fixture();
-    await write(
-      join(temporary, 'docs', 'ARCHITECTURE.md'),
+      'machine-only version probe',
+    ],
+    [
+      'docs/ARCHITECTURE.md',
       'linux-x86_64 linux-aarch64 darwin-aarch64 windows-x86_64\nLLVM bundle\n',
-    );
-    await expect(validateDocumentation(temporary)).rejects.toThrow('comparison revision');
-
-    await fixture();
-    await write(
-      join(temporary, 'docs', 'ARCHITECTURE.ja.md'),
+      'comparison revision',
+    ],
+    [
+      'docs/ARCHITECTURE.ja.md',
       `${OVERLAY_REVISION}\nLLVM bundle\n`,
-    );
-    await expect(validateDocumentation(temporary)).rejects.toThrow(
       'docs/ARCHITECTURE.ja.md platform',
-    );
+    ],
+  ])('rejects drift in %s: %s', async (name, content, message) => {
+    await write(join(temporary, name), content);
+    await expect(validateDocumentation(temporary)).rejects.toThrow(message);
   });
 
   it('rejects malformed source configuration and arguments', async () => {

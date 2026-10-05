@@ -57,13 +57,10 @@ export async function parseMetadata(path: string): Promise<Metadata> {
     if (match?.[1] !== undefined && match[2] !== undefined) result[match[1]] = match[2];
   }
   for (const match of text.matchAll(LIST_FIELD_RE)) {
-    const name = match[1];
-    const body = match[2];
-    if (name !== undefined && body !== undefined) {
-      result[name] = [...body.matchAll(LIST_VALUE_RE)].flatMap((value) =>
-        value[1] === undefined ? [] : [value[1]],
-      );
-    }
+    // Both groups are mandatory in LIST_FIELD_RE, including an empty list body.
+    const name = String(match[1]);
+    const body = String(match[2]);
+    result[name] = [...body.matchAll(LIST_VALUE_RE)].map((value) => String(value[1]));
   }
 
   const missing = [...REQUIRED_METADATA].filter((name) => !(name in result)).toSorted(compareText);

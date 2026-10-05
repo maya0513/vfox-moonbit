@@ -20,26 +20,26 @@ function capture(text: string, pattern: RegExp, label: string): string {
 export function miseTasks(text: string): Set<string> {
   const tasks = new Set<string>();
   for (const match of text.matchAll(/^\[tasks\.(?:"([^"]+)"|([^\]]+))\]$/gm)) {
-    const name = match[1] ?? match[2];
-    if (name !== undefined) tasks.add(name);
+    // One of the two capture groups always matches a nonempty task name.
+    tasks.add(String(match[1] ?? match[2]));
   }
   return tasks;
 }
 
 export function documentedTasks(text: string): Set<string> {
   return new Set(
-    [...text.matchAll(/\bmise run ([A-Za-z0-9:.-]+)/g)].flatMap((match) => match[1] ?? []),
+    [...text.matchAll(/\bmise run ([A-Za-z0-9:.-]+)/g)].map((match) => String(match[1])),
   );
 }
 
 export function localLinks(text: string): string[] {
   return [...text.matchAll(/\[[^\]]+\]\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)/g)].flatMap(
     (match) => {
-      const target = match[1] ?? match[2];
-      if (target === undefined || target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
+      const target = String(match[1] ?? match[2]);
+      if (target.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
         return [];
       }
-      return [target.split('#', 1)[0] ?? target];
+      return [target.slice(0, target.includes('#') ? target.indexOf('#') : target.length)];
     },
   );
 }
@@ -78,10 +78,11 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
     readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
   ]);
-  const pluginVersion = metadata.version;
-  if (typeof pluginVersion !== 'string') throw new DocumentationError('plugin version is missing');
+  // parseMetadata requires the version string before returning.
+  const pluginVersion = String(metadata.version);
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
   const vfoxVersion = capture(mise, /^vfox\s*=\s*"([^"]+)"$/m, 'vfox version');
+  const vfoxSeries = /^\d+$/.test(vfoxVersion) ? `${vfoxVersion}.x` : vfoxVersion;
   const projectToolSpec = `mise use 'vfox:${EXPECTED_REPOSITORY}@latest'`;
   const projectConfigSpec = `"vfox:${EXPECTED_REPOSITORY}" = "latest"`;
   const releaseUrl = `https://github.com/${EXPECTED_REPOSITORY}/releases/download/v${pluginVersion}/vfox-moonbit-${pluginVersion}.zip`;
@@ -92,8 +93,8 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     requireText(document, projectToolSpec, `${name} project mise usage`);
     requireText(document, projectConfigSpec, `${name} mise.toml tool specification`);
     requireText(document, releaseUrl, `${name} standalone vfox release URL`);
-    requireText(document, miseVersion, `${name} tested mise version`);
-    requireText(document, vfoxVersion, `${name} tested vfox version`);
+    requireText(document, miseVersion, `${name} minimum mise version`);
+    requireText(document, `vfox ${vfoxSeries}`, `${name} tested vfox series`);
     requireText(document, 'MOON_TOOLCHAIN_ROOT', `${name} toolchain environment`);
     requireText(document, 'MOON_HOME', `${name} mutable state environment`);
     requireText(document, `${projectToolSpec}\nmoon version`, `${name} direct MoonBit quick start`);
