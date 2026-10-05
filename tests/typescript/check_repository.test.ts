@@ -296,8 +296,8 @@ describe('Node maintenance tooling policy', () => {
     ['tsconfig.json', '[]', 'strict erasable Node'],
     ['tsconfig.json', '{"compilerOptions":null}', 'strict erasable Node'],
     ['vite.config.ts', 'export default {}', 'cached task graph'],
-    ['vite.tasks.ts', 'export const tasks = {}', 'disable caching'],
-    ['vite.tasks.ts', 'cache: false', 'disable caching'],
+    ['vite.tasks.ts', 'export const tasks = {}', 'must define maintenance task'],
+    ['vite.tasks.ts', 'cache: false', 'must define maintenance task'],
     ['.github/workflows/ci.yml', 'steps: []', 'restore and save'],
   ])('rejects invalid %s configuration: %s', async (name, text, message) => {
     await makeMaintenanceConfiguration(temporary);
@@ -306,11 +306,39 @@ describe('Node maintenance tooling policy', () => {
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow(message);
   });
 
-  it('requires every maintenance task to delegate to the task graph', async () => {
+  it.each([
+    ['[tasks.bootstrap]', '[tasks.setup]'],
+    ['[tasks."update:tooling"]', '[tasks.update]'],
+    ['bash scripts/bootstrap.sh', 'true'],
+    ['bash scripts/update-tooling.sh', 'true'],
+    ['', '\n[tasks.ci]\nrun = "true"\n'],
+  ])('keeps only setup and tooling updates in mise: %s', async (before, after) => {
     await makeMaintenanceConfiguration(temporary);
     const path = join(temporary, 'mise.toml');
-    await writeFile(path, (await readFile(path, 'utf8')).replace('pnpm exec vp run ci', 'true'));
-    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('mise task ci');
+    await writeFile(path, (await readFile(path, 'utf8')).replace(before, after));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow(
+      'only bootstrap and update:tooling',
+    );
+  });
+
+  it.each(['bootstrap', 'update:tooling'])('rejects a duplicate %s Vite task', async (task) => {
+    await makeMaintenanceConfiguration(temporary);
+    const path = join(temporary, 'vite.tasks.ts');
+    await writeFile(path, (await readFile(path, 'utf8')) + `\n  '${task}': {\n`);
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('belong only in mise');
+  });
+
+  it.each(['some', 'all'])('rejects %s missing uncached tasks', async (mode) => {
+    await makeMaintenanceConfiguration(temporary);
+    const path = join(temporary, 'vite.tasks.ts');
+    const text = await readFile(path, 'utf8');
+    await writeFile(
+      path,
+      mode === 'all'
+        ? text.replaceAll('cache: false', 'cache: true')
+        : text.replace('cache: false', 'cache: true'),
+    );
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('may disable caching');
   });
 });
 

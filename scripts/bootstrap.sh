@@ -19,12 +19,10 @@ for specification in "${rock_specs[@]}"; do
   [[ -z "$specification" || "$specification" == \#* ]] && continue
   rock="${specification%% *}"
   version="${specification#* }"
-  if mise exec conda:lua conda:luarocks -- \
-    luarocks --lua-dir="$lua_root" --lua-version="${minor}" --tree="$tree" \
+  if luarocks --lua-dir="$lua_root" --lua-version="${minor}" --tree="$tree" \
     show "$rock" "$version" >/dev/null 2>&1; then
     continue
   fi
-  mise exec conda:gcc conda:lua conda:luarocks -- \
-    luarocks --lua-dir="$lua_root" --lua-version="${minor}" --tree="$tree" \
+  luarocks --lua-dir="$lua_root" --lua-version="${minor}" --tree="$tree" \
     install "$rock" "$version" --deps-mode=none RT_LIBDIR="$rt_libdir" </dev/null
 done

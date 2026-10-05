@@ -112,10 +112,6 @@ export const tasks = {
     command: 'node scripts/update_latest.ts',
     cache: false,
   },
-  'update:tooling': {
-    command: 'bash scripts/update-tooling.sh',
-    cache: false,
-  },
   ci: {
     command: 'git diff --check',
     dependsOn: [

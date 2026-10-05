@@ -72,11 +72,33 @@ The scheduled GitHub Actions workflow runs once a day. It uses a GitHub App toke
 
 ## Development and maintenance tools
 
-`mise run coverage` requires 100% line coverage for each first-party Lua runtime file and 100% statements, branches, functions, and lines for each maintenance TypeScript file. The Lua checker uses hit/miss counts as well as reported percentages, so rounding cannot hide missed lines. Vendored SHA code and the real-download E2E harness retain their separate checks. Tests use local archive fixtures and injected I/O failures to validate unsafe paths, bounded downloads, cleanup, immutable manifests, and deterministic packages without contacting upstream services.
+`pnpm vp run coverage` requires 100% line coverage for each first-party Lua runtime file and 100% statements, branches, functions, and lines for each maintenance TypeScript file. The Lua checker uses hit/miss counts as well as reported percentages, so rounding cannot hide missed lines. Vendored SHA code and the real-download E2E harness retain their separate checks. Tests use local archive fixtures and injected I/O failures to validate unsafe paths, bounded downloads, cleanup, immutable manifests, and deterministic packages without contacting upstream services.
 
 Maintenance TypeScript CLIs run directly through Node 24 type stripping without prior transpilation. Vite Task manages execution order and caching for formatting, linting, unit tests, coverage, documentation checks, manifest checks, and package creation. Cacheable tasks derive fingerprints from their input files and restore coverage results and the package under `dist`. E2E tests, upstream discovery, and release operations depend on the network or user state and are excluded from caching.
 
-mise selects compatible version ranges for Node, pnpm, Lua, LuaRocks, and workflow inspection tools; mise.lock records the resolved versions. npm dependencies use compatible ranges and pnpm-lock.yaml, while the Vite core, Vitest runner, and coverage provider stay aligned with Vite+. GitHub Actions follow major tags. The weekly maintenance updater refreshes the tool and dependency locks in one pull request, replacing individual Dependabot version-update PRs. Major upgrades require an explicit range change. `mise run update:tooling` performs the same update locally. `mise run` provides a single developer-facing entry point and delegates each check to Vite Task. The repository checker validates ownership, approved dependency ranges and workflow references, manifests, and the absence of prohibited Python files. The documentation checker compares documented versions, commands, platforms, environment variables, and local links with the implementation.
+mise selects compatible version ranges for Node, pnpm, Lua, LuaRocks, and workflow inspection tools; mise.lock records the resolved versions. npm dependencies use compatible ranges and pnpm-lock.yaml, while the Vite core, Vitest runner, and coverage provider stay aligned with Vite+. GitHub Actions follow major tags. The weekly maintenance updater refreshes the tool and dependency locks in one pull request, replacing individual Dependabot version-update PRs. Major upgrades require an explicit range change. `mise run bootstrap` prepares locked Node and Lua dependencies before the project-local Vite+ CLI is available; `mise run update:tooling` refreshes the toolchain itself. These are the only mise tasks. All checks, packaging, E2E, and upstream discovery are defined only in Vite Task and run through `pnpm vp run <task>`. Shell activation locally and mise-action in CI provide the tool environment; ordinary task calls do not use `mise exec`. The repository checker validates ownership, approved dependency ranges and workflow references, manifests, and the absence of prohibited Python files. The documentation checker compares documented versions, commands, platforms, environment variables, and local links with the implementation.
+
+### Maintenance commands
+
+Activate mise in your shell before running these commands. Full Lua test setup currently requires Linux x86_64.
+
+```shell
+mise install --locked
+mise run bootstrap
+pnpm vp run ci
+```
+
+| Command | Purpose |
+| --- | --- |
+| `mise run bootstrap` | Install frozen npm dependencies and locked Lua test dependencies |
+| `mise run update:tooling` | Refresh compatible tool and npm dependency locks |
+| `pnpm vp run fmt:check` / `pnpm vp run lint` | Formatting and static analysis |
+| `pnpm vp run test:unit` / `pnpm vp run coverage` | Unit tests and complete coverage |
+| `pnpm vp run docs:check` / `pnpm vp run update:check` | Documentation and release-manifest validation |
+| `pnpm vp run package` | Generate the deterministic plugin package |
+| `pnpm vp run e2e` / `pnpm vp run e2e:vfox` | Real-download integration tests |
+| `pnpm vp run update:discover` | Discover a complete upstream MoonBit release |
+| `pnpm vp run ci` | Run deterministic checks together; E2E runs separately |
 
 ## Comparison with moonbit-overlay
 

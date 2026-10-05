@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          output="$(pnpm exec vp run update:discover 2>&1)"
+          output="$(pnpm vp run update:discover 2>&1)"
           exit_code=$?
           set -e
           printf '%s\n' "$output"

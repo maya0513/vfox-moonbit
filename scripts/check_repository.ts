@@ -7,6 +7,7 @@ import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseMetadata } from './package_plugin.ts';
+import { miseTasks, viteTasks as taskNames } from './check_documentation.ts';
 import { validateLocal } from './update_latest.ts';
 import { compareText, isMain, isRecord } from './lib/common.ts';
 import { EXPECTED_REPOSITORY, OWNER, REPOSITORY } from './lib/project.ts';
@@ -360,20 +361,15 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   if (!/^node\s*=\s*"24"$/m.test(mise) || !/^pnpm\s*=\s*"12"$/m.test(mise)) {
     throw new RepositoryError('mise.toml must select the approved Node.js and pnpm major versions');
   }
-  for (const task of [
-    'fmt:check',
-    'lint',
-    'test:unit',
-    'coverage',
-    'docs:check',
-    'e2e',
-    'package',
-    'update:check',
-    'ci',
-  ]) {
-    if (!mise.includes(`pnpm exec vp run ${task}`)) {
-      throw new RepositoryError(`mise task ${task} must delegate to the Vite+ task graph`);
-    }
+  const selectedMiseTasks = miseTasks(mise);
+  if (
+    selectedMiseTasks.size !== 2 ||
+    !selectedMiseTasks.has('bootstrap') ||
+    !selectedMiseTasks.has('update:tooling') ||
+    !mise.includes('run = "bash scripts/bootstrap.sh"') ||
+    !mise.includes('run = "bash scripts/update-tooling.sh"')
+  ) {
+    throw new RepositoryError('mise must define only bootstrap and update:tooling shell tasks');
   }
 
   const viteConfig = await readFile(join(repository, 'vite.config.ts'), 'utf8');
@@ -385,8 +381,29 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   ) {
     throw new RepositoryError('Vite+ configuration must enable and import the cached task graph');
   }
-  if ((viteTasks.match(/cache: false/g) ?? []).length !== 4) {
-    throw new RepositoryError('only E2E and dependency discovery Vite+ tasks may disable caching');
+  const selectedViteTasks = taskNames(viteTasks);
+  for (const task of [
+    'fmt:check',
+    'lint',
+    'test:unit',
+    'coverage',
+    'docs:check',
+    'e2e',
+    'e2e:vfox',
+    'package',
+    'update:check',
+    'update:discover',
+    'ci',
+  ]) {
+    if (!selectedViteTasks.has(task)) {
+      throw new RepositoryError(`Vite Task must define maintenance task: ${task}`);
+    }
+  }
+  if (selectedViteTasks.has('bootstrap') || selectedViteTasks.has('update:tooling')) {
+    throw new RepositoryError('bootstrap and update:tooling belong only in mise');
+  }
+  if ((viteTasks.match(/cache: false/g) ?? []).length !== 3) {
+    throw new RepositoryError('only E2E and upstream discovery Vite+ tasks may disable caching');
   }
 
   const ciWorkflow = await readFile(join(repository, '.github', 'workflows', 'ci.yml'), 'utf8');
