@@ -33,7 +33,7 @@ description = "Run Lua 5.1 and TypeScript unit tests"
 run = "pnpm exec vp run test:unit"
 
 [tasks.coverage]
-description = "Enforce first-party Lua and TypeScript coverage at 95%"
+description = "Enforce first-party Lua and TypeScript coverage at 100%"
 run = "pnpm exec vp run coverage"
 
 [tasks."docs:check"]
