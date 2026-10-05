@@ -36,7 +36,7 @@ afterEach(async () => {
 async function completeReport(coverage = 100): Promise<string> {
   return [...(await expectedFiles(temporary))]
     .toSorted()
-    .map((name) => `${name} 10 0 ${coverage.toFixed(2)}%`)
+    .map((name) => `${name} ${coverage} ${100 - coverage} ${coverage.toFixed(2)}%`)
     .join('\n');
 }
 
@@ -72,6 +72,7 @@ Total                         109      5   95.61%
   });
 
   it('parses strict CLI arguments', () => {
+    expect(parseArguments([]).minimum).toBe(100);
     expect(parseArguments(['--report', 'custom.out', '--minimum', '96'])).toMatchObject({
       minimum: 96,
     });
@@ -81,6 +82,31 @@ Total                         109      5   95.61%
     expect(() => parseArguments(['--report'])).toThrow('requires a value');
     expect(() => parseArguments(['--repo'])).toThrow('requires a value');
     expect(() => parseArguments(['--unknown'])).toThrow('unknown argument');
+  });
+
+  it('rejects missed lines even when LuaCov rounds the percentage to 100.00%', async () => {
+    const report = join(temporary, 'rounded.out');
+    await writeFile(
+      report,
+      (await completeReport()).replace(
+        'hooks/available.lua 100 0 100.00%',
+        'hooks/available.lua 99999 1 100.00%',
+      ),
+    );
+    await expect(checkCoverage({ minimum: 100, report, repository: temporary })).rejects.toThrow(
+      'hooks/available.lua',
+    );
+  });
+
+  it.each(['1 0 ...%', '1 0 101%', '9007199254740992 0 100%'])(
+    'rejects malformed numeric data: %s',
+    (row) => {
+      expect(() => parseReport(`hooks/available.lua ${row}`)).toThrow('invalid LuaCov');
+    },
+  );
+
+  it('accepts files with no executable lines', () => {
+    expect(parseReport('hooks/available.lua 0 0 100.00%').get('hooks/available.lua')).toBe(100);
   });
 
   it('returns CLI-compatible success and failure codes', async () => {

@@ -200,8 +200,7 @@ export async function checkActions(repository: string): Promise<void> {
   for (const path of workflows) {
     const text = await readFile(path, 'utf8');
     for (const match of text.matchAll(ACTION_RE)) {
-      const reference = match[1];
-      if (reference === undefined) continue;
+      const reference = String(match[1]);
       if (!reference.startsWith('./') && !APPROVED_ACTION_RE.test(reference)) {
         throw new RepositoryError(
           `GitHub Action must use a major tag or full commit SHA in ${path.split('/').at(-1)}: ${reference}`,

@@ -25,7 +25,22 @@ export function parseReport(report: string): Map<string, number> {
   const results = new Map<string, number>();
   for (const line of report.split(/\r?\n/)) {
     const match = ROW.exec(line.trim());
-    if (match?.[1] !== undefined && match[4] !== undefined) results.set(match[1], Number(match[4]));
+    if (match !== null) {
+      const name = String(match[1]);
+      const hits = Number(match[2]);
+      const missed = Number(match[3]);
+      const percentage = Number(match[4]);
+      if (
+        !Number.isSafeInteger(hits + missed) ||
+        !Number.isFinite(percentage) ||
+        percentage > 100
+      ) {
+        throw new Error(`invalid LuaCov coverage row: ${name}`);
+      }
+      // LuaCov rounds percentages: 100.00% can still have missed lines.
+      const counted = hits + missed === 0 ? 100 : (100 * hits) / (hits + missed);
+      results.set(name, Math.min(percentage, counted));
+    }
   }
   return results;
 }
@@ -37,7 +52,7 @@ export interface CoverageArguments {
 }
 
 export function parseArguments(argv: readonly string[]): CoverageArguments {
-  let minimum = 95;
+  let minimum = 100;
   let report = resolve('luacov.report.out');
   let repository = DEFAULT_REPOSITORY;
   for (let index = 0; index < argv.length; index += 1) {

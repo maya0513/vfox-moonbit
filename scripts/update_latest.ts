@@ -514,13 +514,6 @@ function isErrno(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && error.code === code;
 }
 
-function mapValue<Key, Value>(map: ReadonlyMap<Key, Value>, key: Key): Value {
-  const value = map.get(key);
-  if (value === undefined)
-    throw new SupplyChainError('internal updater artifact map is incomplete');
-  return value;
-}
-
 export async function loadJson(path: string): Promise<Record<string, unknown>> {
   let value: unknown;
   try {
@@ -627,38 +620,35 @@ export async function discover(
     'tar.gz': `${CDN}/cores/core-latest.tar.gz`,
     zip: `${CDN}/cores/core-latest.zip`,
   };
-  const latestCore = new Map<ArchiveFormat, DownloadedFile>();
-  const versions = new Set<string>();
-  for (const format of ['tar.gz', 'zip'] as const) {
+  async function latestArchive(format: ArchiveFormat) {
     const downloaded = await downloader.fetch(latestUrls[format], limits.coreBytes);
-    latestCore.set(format, downloaded);
     const inspection = await inspectArchive(downloaded.path, format, {
       label: `latest core ${format}`,
       limits,
       required: CORE_REQUIRED,
     });
-    versions.add(coreVersion(inspection.moonMod));
     console.error(`verified latest core ${format}`);
+    return { downloaded, version: coreVersion(inspection.moonMod) };
   }
-  if (versions.size !== 1) {
+  const tarCore = await latestArchive('tar.gz');
+  const zipCore = await latestArchive('zip');
+  if (tarCore.version !== zipCore.version) {
     throw new IncompleteRelease('latest core tar.gz and zip point to different MoonBit versions');
   }
-  const version = [...versions][0];
-  if (version === undefined) {
-    throw new SupplyChainError('latest core did not expose a version');
-  }
+  const version = tarCore.version;
+  const latestCore = { 'tar.gz': tarCore.downloaded, zip: zipCore.downloaded };
   encodeVersion(version);
 
-  const exactCore = new Map<ArchiveFormat, DownloadedFile>();
-  for (const format of ['tar.gz', 'zip'] as const) {
-    const latest = mapValue(latestCore, format);
+  async function exactArchive(format: ArchiveFormat): Promise<DownloadedFile> {
+    const latest = latestCore[format];
     const downloaded = await downloader.fetch(coreUrl(version, format), limits.coreBytes);
     if (!(await filesEqual(downloaded, latest))) {
       throw new SupplyChainError(`latest and exact MoonBit core differ for ${format}`);
     }
-    exactCore.set(format, downloaded);
     console.error(`verified exact core ${format}`);
+    return downloaded;
   }
+  const exactCore = { 'tar.gz': await exactArchive('tar.gz'), zip: await exactArchive('zip') };
 
   const encoded = encodeVersion(version);
   const platforms: Record<string, PlatformRecord> = {};
@@ -679,7 +669,7 @@ export async function discover(
     });
     console.error(`verified ${platform.key} toolchain`);
     const coreFormat = platform.format === 'zip' ? 'zip' : 'tar.gz';
-    const core = mapValue(exactCore, coreFormat);
+    const core = exactCore[coreFormat];
     platforms[platform.key] = {
       core: makeArtifact(coreUrl(version, coreFormat), core.sha256, coreFormat),
       toolchain: makeArtifact(url, toolchain.sha256, platform.format),
@@ -688,7 +678,7 @@ export async function discover(
 
   for (const format of ['tar.gz', 'zip'] as const) {
     const after = await downloader.fetch(latestUrls[format], limits.coreBytes);
-    if (!(await filesEqual(after, mapValue(latestCore, format)))) {
+    if (!(await filesEqual(after, latestCore[format]))) {
       throw new IncompleteRelease(
         `MoonBit latest ${format} changed during discovery; deferring promotion`,
       );

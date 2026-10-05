@@ -9,6 +9,6 @@ MOONBIT_COVERAGE=1 \
   mise exec conda:lua -- ".rocks/${minor}/bin/busted" --coverage tests/lua
 LUA_PATH=".rocks/${minor}/share/lua/${minor}/?.lua;.rocks/${minor}/share/lua/${minor}/?/init.lua;;" \
   mise exec conda:lua -- ".rocks/${minor}/bin/luacov"
-pnpm exec vp exec node scripts/check_lua_coverage.ts --minimum 95
+pnpm exec vp exec node scripts/check_lua_coverage.ts --minimum 100
 
 pnpm exec vp test run --coverage

@@ -1,7 +1,8 @@
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
@@ -20,7 +21,6 @@ import {
   validate,
   workflowFiles,
 } from '../../scripts/check_repository.ts';
-import { releaseFiles } from '../../scripts/package_plugin.ts';
 import {
   canonicalJson,
   coreUrl,
@@ -28,9 +28,8 @@ import {
   PLATFORMS,
   promote,
 } from '../../scripts/update_latest.ts';
-import { sha256 } from './fixtures.ts';
+import { copyReleaseSource, REPOSITORY, sha256 } from './fixtures.ts';
 
-const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 let temporary: string;
 
 function originResult(status: number, stdout: string): () => { status: number; stdout: string } {
@@ -46,15 +45,6 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await rm(temporary, { force: true, recursive: true });
 });
-
-async function copyReleaseSource(destination: string): Promise<string> {
-  for (const source of await releaseFiles(REPOSITORY)) {
-    const target = join(destination, relative(REPOSITORY, source));
-    await mkdir(dirname(target), { recursive: true });
-    await copyFile(source, target);
-  }
-  return destination;
-}
 
 function validExact(version = '0.1.2+abc'): Record<string, unknown> {
   const encoded = encodeVersion(version);
@@ -230,6 +220,21 @@ describe('Node maintenance tooling policy', () => {
     await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
   });
 
+  it('ignores deleted tracked files while validating the present repository', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    await makeWorkflow(
+      temporary,
+      'ci.yml',
+      'uses: actions/cache/restore@v6\nuses: actions/cache/save@v6\npath: node_modules/.vite/task-cache\n',
+    );
+    const runGit = promisify(execFile);
+    await writeFile(join(temporary, 'removed.py'), 'obsolete');
+    await runGit('git', ['init', temporary]);
+    await runGit('git', ['add', '.'], { cwd: temporary });
+    await rm(join(temporary, 'removed.py'));
+    await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
+  });
+
   it('accepts pinned Node/Vite+ configuration and rejects Python remnants', async () => {
     await makeMaintenanceConfiguration(temporary);
     await makeWorkflow(
@@ -285,6 +290,27 @@ describe('Node maintenance tooling policy', () => {
     const miseText = await readFile(misePath, 'utf8');
     await writeFile(misePath, miseText.replace('node = "24"', 'node = "26"'));
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Node.js and pnpm');
+  });
+
+  it.each([
+    ['tsconfig.json', '[]', 'strict erasable Node'],
+    ['tsconfig.json', '{"compilerOptions":null}', 'strict erasable Node'],
+    ['vite.config.ts', 'export default {}', 'cached task graph'],
+    ['vite.tasks.ts', 'export const tasks = {}', 'disable caching'],
+    ['vite.tasks.ts', 'cache: false', 'disable caching'],
+    ['.github/workflows/ci.yml', 'steps: []', 'restore and save'],
+  ])('rejects invalid %s configuration: %s', async (name, text, message) => {
+    await makeMaintenanceConfiguration(temporary);
+    await makeWorkflow(temporary, 'ci.yml', 'steps: []');
+    await writeFile(join(temporary, name), text);
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow(message);
+  });
+
+  it('requires every maintenance task to delegate to the task graph', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    const path = join(temporary, 'mise.toml');
+    await writeFile(path, (await readFile(path, 'utf8')).replace('pnpm exec vp run ci', 'true'));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('mise task ci');
   });
 });
 

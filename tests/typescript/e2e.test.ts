@@ -1,18 +1,9 @@
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  unlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { copyReleaseSource, REPOSITORY } from './fixtures.ts';
 
 import {
   assertWithin,
@@ -33,9 +24,7 @@ import {
   validateInstall,
   withManifestServer,
 } from '../../scripts/e2e.ts';
-import { releaseFiles } from '../../scripts/package_plugin.ts';
 
-const REPOSITORY = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 let temporary: string;
 
 beforeEach(async () => {
@@ -46,17 +35,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   await rm(temporary, { force: true, recursive: true });
 });
-
-async function copyReleaseSource(destination: string): Promise<string> {
-  for (const source of await releaseFiles(REPOSITORY)) {
-    const target = join(destination, relative(REPOSITORY, source));
-    await mkdir(dirname(target), { recursive: true });
-    await copyFile(source, target);
-  }
-  return destination;
-}
 
 describe('E2E helper invariants', () => {
   it('reads only supported exact versions', async () => {
@@ -196,11 +177,8 @@ describe('E2E helper invariants', () => {
     });
     expect(() => parseArguments(['--backend', 'bad'])).toThrow('must be mise');
     expect(() => parseArguments(['--unknown'])).toThrow('unknown');
-    const previousCi = process.env.CI;
-    delete process.env.CI;
+    vi.stubEnv('CI', undefined);
     await expect(main(['--repo', REPOSITORY, '--backend', 'vfox'])).resolves.toBe(2);
-    if (previousCi === undefined) delete process.env.CI;
-    else process.env.CI = previousCi;
   });
 
   it('builds fresh-shell activation commands without mise exec', () => {
