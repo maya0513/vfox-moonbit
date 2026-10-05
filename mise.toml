@@ -5,16 +5,16 @@ experimental = true
 lockfile = true
 
 [tools]
-actionlint = "1.7.12"
-"conda:gcc" = { version = "16.2.0", os = ["linux"] }
-"conda:lua" = { version = "5.1.5", os = ["linux"] }
-"conda:luarocks" = { version = "3.13.0", os = ["linux"] }
-node = "24.21.0"
-pnpm = "12.4.2"
-shellcheck = "0.11.0"
-stylua = "2.5.2"
-vfox = "1.0.12"
-zizmor = "1.30.0"
+actionlint = "1"
+"conda:gcc" = { version = "16", os = ["linux"] }
+"conda:lua" = { version = "5.1", os = ["linux"] }
+"conda:luarocks" = { version = "3", os = ["linux"] }
+node = "24"
+pnpm = "12"
+shellcheck = "0.11"
+stylua = "2"
+vfox = "1"
+zizmor = "1"
 
 [tasks.bootstrap]
 description = "Install locked Node and Lua test dependencies"
@@ -55,3 +55,7 @@ run = "pnpm exec vp run update:check"
 [tasks.ci]
 description = "Run the same deterministic checks as GitHub Actions"
 run = "pnpm exec vp run ci"
+
+[tasks."update:tooling"]
+description = "Update tool and dependency locks within the configured ranges"
+run = "bash scripts/update-tooling.sh"

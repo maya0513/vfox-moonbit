@@ -82,6 +82,7 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
   if (typeof pluginVersion !== 'string') throw new DocumentationError('plugin version is missing');
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
   const vfoxVersion = capture(mise, /^vfox\s*=\s*"([^"]+)"$/m, 'vfox version');
+  const vfoxSeries = /^\d+$/.test(vfoxVersion) ? `${vfoxVersion}.x` : vfoxVersion;
   const projectToolSpec = `mise use 'vfox:${EXPECTED_REPOSITORY}@latest'`;
   const projectConfigSpec = `"vfox:${EXPECTED_REPOSITORY}" = "latest"`;
   const releaseUrl = `https://github.com/${EXPECTED_REPOSITORY}/releases/download/v${pluginVersion}/vfox-moonbit-${pluginVersion}.zip`;
@@ -92,8 +93,8 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     requireText(document, projectToolSpec, `${name} project mise usage`);
     requireText(document, projectConfigSpec, `${name} mise.toml tool specification`);
     requireText(document, releaseUrl, `${name} standalone vfox release URL`);
-    requireText(document, miseVersion, `${name} tested mise version`);
-    requireText(document, vfoxVersion, `${name} tested vfox version`);
+    requireText(document, miseVersion, `${name} minimum mise version`);
+    requireText(document, `vfox ${vfoxSeries}`, `${name} tested vfox series`);
     requireText(document, 'MOON_TOOLCHAIN_ROOT', `${name} toolchain environment`);
     requireText(document, 'MOON_HOME', `${name} mutable state environment`);
     requireText(document, `${projectToolSpec}\nmoon version`, `${name} direct MoonBit quick start`);

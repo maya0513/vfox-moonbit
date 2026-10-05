@@ -74,7 +74,7 @@ scheduled GitHub Actions workflowは1日1回実行します。GitHub App token�
 
 保守用のTypeScript CLIは、Node 24の型除去機能により事前のtranspileなしで直接実行します。Vite Taskはformat、lint、unit test、coverage、documentation検査、manifest検査、package作成の実行順序とcacheを管理します。cache対象のtaskでは入力fileからfingerprintを算出し、coverage結果と`dist`のpackageを生成物として復元します。networkや利用者のstateへ依存するE2E、upstream discovery、release操作はcacheの対象外です。
 
-miseはNode、pnpm、Lua、LuaRocks、workflow検査toolのversionを固定します。開発者向けの入口を`mise run`へ統一し、各taskの処理をVite Taskへ委譲します。repository checkerはowner、dependencyとworkflowのpin、manifest、禁止されたPython関連fileの残存を検証します。documentation checkerはversion、command、platform、環境変数、local linkの記述を実装と照合します。
+miseはNode、pnpm、Lua、LuaRocks、workflow検査toolの互換version範囲を指定し、解決したversionをmise.lockへ記録します。npm依存は互換範囲とpnpm-lock.yamlを使い、Vite core・Vitest・coverage providerはVite+に合わせて一緒に更新します。GitHub Actionsはmajor tagへ追従します。週次のmaintenance updaterがtoolと依存のlockを1件のPRにまとめて更新し、個別のDependabot version更新PRを置き換えます。major更新には明示的な範囲変更が必要です。`mise run update:tooling`で同じ更新をローカル実行できます。開発者向けの入口は`mise run`へ統一し、各checkをVite Taskへ委譲します。repository checkerはowner、承認済みの依存範囲とworkflow参照、manifest、禁止されたPython関連fileの残存を検証します。documentation checkerはversion、command、platform、環境変数、local linkの記述を実装と照合します。
 
 ## moonbit-overlayとの比較
 

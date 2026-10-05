@@ -1,0 +1,7 @@
+# actionlint's bundled v3 schema still requires the deprecated app-id input.
+# The current create-github-app-token v3 action also accepts client-id.
+paths:
+  .github/workflows/{update-latest,update-tooling}.yml:
+    ignore:
+      - '^missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
+      - '^input "client-id" is not defined in action "actions/create-github-app-token@v3"'

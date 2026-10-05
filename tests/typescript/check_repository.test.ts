@@ -171,16 +171,18 @@ describe('release and Actions policy', () => {
     await expect(checkReleasePolicy(temporary)).rejects.toThrow('exceeds');
   });
 
-  it('requires workflows and full action commit pins', async () => {
+  it('requires workflows and action major tags or full commit pins', async () => {
     await expect(workflowFiles(temporary)).resolves.toEqual([]);
     await mkdir(join(temporary, '.github', 'workflows'), { recursive: true });
     await expect(checkActions(temporary)).rejects.toThrow('no GitHub Actions');
     const workflow = await makeWorkflow(
       temporary,
       'ci.yml',
-      'steps:\n  - uses: ./local\n  - uses: actions/checkout@v6\n',
+      'steps:\n  - uses: ./local\n  - uses: actions/checkout@main\n',
     );
-    await expect(checkActions(temporary)).rejects.toThrow('not pinned');
+    await expect(checkActions(temporary)).rejects.toThrow('major tag or full commit');
+    await writeFile(workflow, 'steps:\n  - uses: ./local\n  - uses: actions/checkout@v7\n');
+    await expect(checkActions(temporary)).resolves.toBeUndefined();
     await writeFile(
       workflow,
       `steps:\n  - uses: ./local\n  - uses: actions/checkout@${'a'.repeat(40)}\n`,
@@ -215,6 +217,19 @@ describe('release and Actions policy', () => {
 });
 
 describe('Node maintenance tooling policy', () => {
+  it('allows dependency updates within the selected major', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    const packagePath = join(temporary, 'package.json');
+    const packageText = await readFile(packagePath, 'utf8');
+    await writeFile(packagePath, packageText.replace(/"tar": "[^"]+"/, '"tar": "^7.99.0"'));
+    await makeWorkflow(
+      temporary,
+      'ci.yml',
+      'uses: actions/cache/restore@v6\nuses: actions/cache/save@v6\npath: node_modules/.vite/task-cache\n',
+    );
+    await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
+  });
+
   it('accepts pinned Node/Vite+ configuration and rejects Python remnants', async () => {
     await makeMaintenanceConfiguration(temporary);
     await makeWorkflow(
@@ -237,7 +252,7 @@ describe('Node maintenance tooling policy', () => {
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('configuration is missing');
     await makeMaintenanceConfiguration(temporary);
     await writeFile(join(temporary, 'package.json'), JSON.stringify({ private: false }));
-    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('must pin');
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('must declare');
     await writeFile(join(temporary, 'package.json'), '[]');
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('contain an object');
   });
@@ -246,7 +261,7 @@ describe('Node maintenance tooling policy', () => {
     await makeMaintenanceConfiguration(temporary);
     const packagePath = join(temporary, 'package.json');
     const packageText = await readFile(packagePath, 'utf8');
-    await writeFile(packagePath, packageText.replace('"tar": "7.5.22"', '"tar": "7.5.21"'));
+    await writeFile(packagePath, packageText.replace(/"tar": "[^"]+"/, '"tar": "^8.0.0"'));
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('maintenance packages');
     await writeFile(packagePath, packageText);
 
@@ -268,7 +283,7 @@ describe('Node maintenance tooling policy', () => {
 
     const misePath = join(temporary, 'mise.toml');
     const miseText = await readFile(misePath, 'utf8');
-    await writeFile(misePath, miseText.replace('node = "24.21.0"', 'node = "24.20.0"'));
+    await writeFile(misePath, miseText.replace('node = "24"', 'node = "26"'));
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Node.js and pnpm');
   });
 });

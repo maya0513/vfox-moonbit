@@ -4,17 +4,23 @@
   "license": "MIT",
   "type": "module",
   "devDependencies": {
-    "@types/node": "24.13.5",
-    "@types/yauzl": "3.4.0",
-    "@types/yazl": "3.3.1",
+    "@types/node": "^24.19.1",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
     "@vitest/coverage-v8": "5.0.1",
-    "tar": "7.5.22",
-    "vite-plus": "1.0.0",
-    "yauzl": "3.4.0",
-    "yazl": "3.3.1"
+    "tar": "^7.5.22",
+    "vite-plus": "^1.0.0",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.x",
+      "onFail": "download"
+    }
   },
   "engines": {
-    "node": "24.21.0"
-  },
-  "packageManager": "pnpm@12.4.2"
+    "node": "24.x"
+  }
 }

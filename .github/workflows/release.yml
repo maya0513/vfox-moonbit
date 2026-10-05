@@ -22,15 +22,14 @@ jobs:
       artifact-metadata: write # Register attested artifact metadata with GitHub.
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install pinned development tools
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+      - name: Install configured development tools
+        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
-          version: 2026.9.2
           install: false
           cache: false
           experimental: true
@@ -53,7 +52,7 @@ jobs:
           pnpm exec vp run package --version "$version" --output dist
 
       - name: Attest the plugin ZIP
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@v4 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
         with:
           subject-path: dist/vfox-moonbit-*.zip
 
