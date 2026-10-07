@@ -101,7 +101,9 @@ inspect_rock() {
     "${rock_command[@]}" unpack "$rockspec" >/dev/null
   )
   local unpack_root="$destination/$name-$version"
-  INSPECT_SOURCE_SPEC="$(find "$unpack_root" -mindepth 2 -type f -name "$name-$version.rockspec" -print -quit)"
+  # LuaRocks copies the recipe into the immediate source directory. Repositories
+  # can also contain older/nested copies; traversal order must not select those.
+  INSPECT_SOURCE_SPEC="$(find "$unpack_root" -mindepth 2 -maxdepth 2 -type f -name "$name-$version.rockspec" -print -quit)"
   if [[ -z "$INSPECT_SOURCE_SPEC" ]]; then
     echo "LuaRocks did not unpack an embedded rockspec: $name $version" >&2
     exit 1

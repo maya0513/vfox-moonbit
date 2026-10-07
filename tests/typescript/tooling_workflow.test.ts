@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -216,5 +217,84 @@ esac
       stderr: expect.stringContaining('verification failed before unpacking'),
     });
     await expect(readFile(unpacked)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('selects the unpacked source root instead of a nested same-name rockspec', async () => {
+    const repository = join(temporary, 'repository');
+    const bin = join(temporary, 'bin');
+    const gcc = join(temporary, 'gcc');
+    await mkdir(join(repository, 'scripts'), { recursive: true });
+    await mkdir(bin);
+    await mkdir(join(gcc, 'x86_64-conda-linux-gnu/sysroot/lib64'), { recursive: true });
+    await writeFile(join(gcc, 'x86_64-conda-linux-gnu/sysroot/lib64/librt.a'), '');
+    await copyFile(
+      join(REPOSITORY, 'scripts/lua-rocks.sh'),
+      join(repository, 'scripts/lua-rocks.sh'),
+    );
+    const recipe = 'package = "fixture"\n';
+    const recipeHash = createHash('sha256').update(recipe).digest('hex');
+    const sourceHash = createHash('sha256');
+    for (const [name, contents] of [
+      ['fixture-1.0-1.rockspec', recipe],
+      ['payload.lua', 'return true\n'],
+      ['rockspecs/fixture-1.0-1.rockspec', recipe],
+    ]) {
+      sourceHash.update(`file\0${name}\0`).update(String(contents)).update('\0');
+    }
+    await writeFile(
+      join(repository, 'lua-rocks.lock'),
+      `fixture 1.0-1 ${recipeHash} ${sourceHash.digest('hex')}\n`,
+    );
+    await writeFile(join(bin, 'mise'), '#!/usr/bin/env bash\nprintf "%s\\n" "$FIXTURE_GCC"\n', {
+      mode: 0o755,
+    });
+    await writeFile(
+      join(bin, 'luarocks'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  *download*) printf 'package = "fixture"\\n' > fixture-1.0-1.rockspec ;;
+  *unpack*)
+    # Create the nested entry first, as on the failing clean CI runner.
+    mkdir -p fixture-1.0-1/source/rockspecs
+    cp fixture-1.0-1.rockspec fixture-1.0-1/source/rockspecs/
+    cp fixture-1.0-1.rockspec fixture-1.0-1/source/
+    printf 'return true\\n' > fixture-1.0-1/source/payload.lua
+    ;;
+  *make*)
+    test -f payload.lua
+    pwd > "$FIXTURE_BUILT"
+    ;;
+  *) exit 99 ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+    const built = join(temporary, 'built');
+    const find = (await execute('sh', ['-c', 'command -v find'])).stdout.trim();
+    await writeFile(
+      join(bin, 'find'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+# Model a filesystem walk that visits the nested rockspec first.
+arguments=()
+for argument in "$@"; do
+  if [[ "$argument" != '-quit' ]]; then arguments+=("$argument"); fi
+done
+"$FIXTURE_FIND" "\${arguments[@]}" | sort -r | head -n 1
+`,
+      { mode: 0o755 },
+    );
+    await execute('bash', ['scripts/lua-rocks.sh', 'install'], {
+      cwd: repository,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        FIXTURE_GCC: gcc,
+        FIXTURE_BUILT: built,
+        FIXTURE_FIND: find,
+      },
+    });
+    expect((await readFile(built, 'utf8')).trim()).toMatch(/\/fixture-1\.0-1\/source$/);
   });
 });
