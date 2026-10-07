@@ -27,7 +27,7 @@ mise install
 moon version
 ```
 
-CI uses the latest stable mise; the minimum supported mise version is 2026.9.2.
+CI uses the latest stable mise; the minimum supported mise version is 2026.10.3.
 
 ### Standalone vfox
 

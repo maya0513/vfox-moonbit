@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out source
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -43,12 +43,22 @@ jobs:
             fi
           done < <(git diff --name-only "$BASE_SHA" -- releases)
 
-      - name: Install configured development tools
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+      - name: Reject vulnerable dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:
+          fail-on-severity: moderate
+
+      - name: Install configured development tools
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
+        with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
           experimental: true
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Install locked development tools
         env:
@@ -61,7 +71,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -72,7 +82,7 @@ jobs:
 
       - name: Restore Vite Task cache
         id: vite-task-cache
-        uses: actions/cache/restore@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: node_modules/.vite/task-cache
           key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -83,7 +93,7 @@ jobs:
 
       - name: Save Vite Task cache
         if: success()
-        uses: actions/cache/save@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
@@ -94,16 +104,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
       - name: Install mise under test
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
           experimental: true
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Validate the compatibility lockfile
         run: mise install --locked --dry-run
@@ -118,16 +132,20 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - name: Check out source
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
       - name: Install mise under test
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
           experimental: true
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Install configured E2E Node toolchain
         env:
@@ -140,7 +158,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -164,15 +182,19 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     steps:
       - name: Check out source
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
       - name: Install mise bootstrapper
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Install configured E2E tools
         env:
@@ -186,7 +208,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}

@@ -22,19 +22,23 @@ jobs:
       issues: write # Open deduplicated maintenance issues with GITHUB_TOKEN.
     steps:
       - name: Check out main
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install configured Node toolchain
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: true
           install_args: node pnpm
           cache: false
           experimental: true
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -42,7 +46,7 @@ jobs:
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
-        uses: actions/cache@v6 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -102,7 +106,7 @@ jobs:
 
       - name: Persist partial-publish state
         if: steps.discover.outputs.incomplete == 'true'
-        uses: actions/upload-artifact@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: moonbit-partial-state
           path: ${{ runner.temp }}/moonbit-partial-state/first-seen-epoch
@@ -168,7 +172,7 @@ jobs:
       - name: Create repository-scoped GitHub App token
         if: steps.discover.outputs.manual_review == 'true' || steps.diff.outputs.changed == 'true'
         id: app-token
-        uses: actions/create-github-app-token@v3 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}
           private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}

@@ -14,8 +14,9 @@ import { EXPECTED_REPOSITORY, OWNER, REPOSITORY } from './lib/project.ts';
 
 export { EXPECTED_REPOSITORY, OWNER, REPOSITORY };
 const ACTION_RE = /^\s*(?:-\s+)?uses:\s*([^\s#]+)/gm;
-const APPROVED_ACTION_RE =
-  /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@(?:[0-9a-f]{40}|v[1-9][0-9]*)$/;
+const APPROVED_ACTION_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/;
+const PINNED_ACTION_LINE_RE =
+  /^\s*(?:-\s+)?uses:\s*[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}\s+#\s+v[1-9][0-9]*\s*$/gm;
 const REMOTE_RE = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(?:\.git)?$/;
 const FORBIDDEN_WORKFLOW_TOOL_RE =
   /\b(?:actions\/setup-python|python(?:3(?:\.\d+)?)?|uv|pytest|ruff)\b/i;
@@ -200,13 +201,36 @@ export async function checkActions(repository: string): Promise<void> {
   if (workflows.length === 0) throw new RepositoryError('no GitHub Actions workflows are present');
   for (const path of workflows) {
     const text = await readFile(path, 'utf8');
+    let remoteCount = 0;
     for (const match of text.matchAll(ACTION_RE)) {
       const reference = String(match[1]);
-      if (!reference.startsWith('./') && !APPROVED_ACTION_RE.test(reference)) {
+      if (reference.startsWith('./')) continue;
+      remoteCount += 1;
+      if (!APPROVED_ACTION_RE.test(reference)) {
         throw new RepositoryError(
-          `GitHub Action must use a major tag or full commit SHA in ${path.split('/').at(-1)}: ${reference}`,
+          `GitHub Action must use a full commit SHA in ${path.split('/').at(-1)}: ${reference}`,
         );
       }
+    }
+    if ([...text.matchAll(PINNED_ACTION_LINE_RE)].length !== remoteCount) {
+      throw new RepositoryError(
+        `GitHub Action pins need trailing major tag comments in ${path.split('/').at(-1)}`,
+      );
+    }
+    let miseCount = 0;
+    for (const step of text.split(/(?=^ {6}- )/m)) {
+      if (!/^ {8}uses:\s*jdx\/mise-action@/m.test(step)) continue;
+      miseCount += 1;
+      if (
+        !/^ {10}minimum_release_age: "0s"(?:\s+#.*)?$/m.test(step) ||
+        !/^ {10}cache: false$/m.test(step) ||
+        /^ {10}version:/m.test(step)
+      ) {
+        throw new RepositoryError('mise-action must explicitly select the latest stable mise');
+      }
+    }
+    if ([...text.matchAll(/^ {8}run: mise --version$/gm)].length !== miseCount) {
+      throw new RepositoryError('workflows using mise must record the actual mise version');
     }
   }
 }
@@ -283,23 +307,23 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   const devDependencies = isRecord(packageDocument.devDependencies)
     ? packageDocument.devDependencies
     : undefined;
-  const devEngines = isRecord(packageDocument.devEngines) ? packageDocument.devEngines : undefined;
-  const packageManager = isRecord(devEngines?.packageManager)
-    ? devEngines.packageManager
-    : undefined;
   if (
     packageDocument.private !== true ||
     packageDocument.version !== undefined ||
     packageDocument.type !== 'module' ||
     engines?.node !== '24.x' ||
+    engines.pnpm !== '12.x' ||
     packageDocument.packageManager !== undefined ||
-    packageManager?.name !== 'pnpm' ||
-    packageManager.version !== '12.x' ||
-    packageManager.onFail !== 'download'
+    packageDocument.devEngines !== undefined
   ) {
     throw new RepositoryError(
-      'package.json must declare the approved Node.js and pnpm ranges and remain private and unversioned',
+      'package.json must declare the approved Node.js and pnpm engine ranges, use mise-managed pnpm, and remain private and unversioned',
     );
+  }
+  if (
+    /\bpackageManagerDependencies:/.test(await readFile(join(repository, 'pnpm-lock.yaml'), 'utf8'))
+  ) {
+    throw new RepositoryError('pnpm itself must be locked only in mise.lock');
   }
   const coverageVersion = devDependencies?.['@vitest/coverage-v8'];
   if (
@@ -325,14 +349,36 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     "  - '.'",
     'storeDir: .pnpm-store',
     `  'vitest@*': '${coverageVersion}'`,
+    "    vite: '1'",
   ];
   if (
     requiredWorkspaceSettings.some((setting) => !workspace.includes(setting)) ||
     !/^  'vite@\*': 'npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+'$/m.test(workspace)
   ) {
     throw new RepositoryError(
-      'pnpm workspace must configure the approved store and aligned Vite/Vitest overrides',
+      'pnpm workspace must configure the approved store, aligned Vite/Vitest overrides, and peer policy',
     );
+  }
+
+  const rockLock = await readFile(join(repository, 'lua-rocks.lock'), 'utf8');
+  const lockedRocks = new Map<string, string>();
+  for (const line of rockLock.split(/\r?\n/)) {
+    if (line === '' || line.startsWith('#')) continue;
+    const match = /^([A-Za-z0-9_-]+) (\S+) ([0-9a-f]{64}) ([0-9a-f]{64})$/.exec(line);
+    if (match?.[1] === undefined || match[2] === undefined) {
+      throw new RepositoryError('lua-rocks.lock must pin version, rockspec hash, and source hash');
+    }
+    if (lockedRocks.has(match[1])) throw new RepositoryError(`duplicate Lua rock: ${match[1]}`);
+    lockedRocks.set(match[1], match[2]);
+  }
+  for (const [name, pattern] of [
+    ['busted', /^2\./],
+    ['luacov', /^0\.16\./],
+    ['luacheck', /^1\./],
+  ] as const) {
+    if (!pattern.test(lockedRocks.get(name) ?? '')) {
+      throw new RepositoryError(`lua-rocks.lock violates the approved ${name} series`);
+    }
   }
 
   const attributes = await readFile(join(repository, '.gitattributes'), 'utf8');
@@ -393,6 +439,7 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     'package',
     'update:check',
     'update:discover',
+    'check',
     'ci',
   ]) {
     if (!selectedViteTasks.has(task)) {
@@ -402,17 +449,44 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   if (selectedViteTasks.has('bootstrap') || selectedViteTasks.has('update:tooling')) {
     throw new RepositoryError('bootstrap and update:tooling belong only in mise');
   }
-  if ((viteTasks.match(/cache: false/g) ?? []).length !== 3) {
-    throw new RepositoryError('only E2E and upstream discovery Vite+ tasks may disable caching');
+  if ((viteTasks.match(/cache: false/g) ?? []).length !== 4) {
+    throw new RepositoryError(
+      'only E2E, upstream discovery, and Git-state checks may disable caching',
+    );
   }
 
   const ciWorkflow = await readFile(join(repository, '.github', 'workflows', 'ci.yml'), 'utf8');
   if (
     !ciWorkflow.includes('node_modules/.vite/task-cache') ||
     !ciWorkflow.includes('actions/cache/restore@') ||
-    !ciWorkflow.includes('actions/cache/save@')
+    !ciWorkflow.includes('actions/cache/save@') ||
+    !ciWorkflow.includes('actions/dependency-review-action@') ||
+    !ciWorkflow.includes('fail-on-severity: moderate')
   ) {
-    throw new RepositoryError('CI must restore and save the isolated Vite Task cache');
+    throw new RepositoryError('CI must enforce dependency review and the isolated Vite Task cache');
+  }
+  const toolingWorkflow = await readFile(
+    join(repository, '.github', 'workflows', 'update-tooling.yml'),
+    'utf8',
+  );
+  for (const contract of [
+    'permission-workflows: write',
+    'mise run update:tooling',
+    '.github/workflows/*.yml|lua-rocks.lock|mise.lock',
+  ]) {
+    if (!toolingWorkflow.includes(contract)) {
+      throw new RepositoryError(`tooling updater is missing contract: ${contract}`);
+    }
+  }
+
+  const toolingUpdater = await readFile(join(repository, 'scripts', 'update-tooling.sh'), 'utf8');
+  if (
+    !toolingUpdater.includes('mise install --locked node pnpm conda:gcc conda:lua conda:luarocks')
+  ) {
+    throw new RepositoryError('tooling updater must install every Lua lock-generation tool');
+  }
+  if (/\bpnpm\s+(?:self-update|env)\b/.test(toolingUpdater)) {
+    throw new RepositoryError('tooling updater must update pnpm only through mise');
   }
   const files = await repositoryFiles(repository);
   const forbidden = files.filter(

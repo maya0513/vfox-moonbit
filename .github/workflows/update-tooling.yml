@@ -19,22 +19,43 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out main
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install current mise
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
           experimental: true
 
+      - name: Record mise version
+        run: mise --version
+
+      - name: Prepare the single automation branch
+        shell: bash
+        run: |
+          branch="automation/maintenance-tooling"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            git fetch origin "$branch"
+            git switch -c "$branch" FETCH_HEAD
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              merge origin/main --no-edit
+          else
+            git switch -c "$branch"
+          fi
+
+      - name: Refresh compatible versions and locks
+        run: mise run update:tooling
+
       - name: Create repository-scoped GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v3 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}
           private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}
@@ -42,8 +63,9 @@ jobs:
           repositories: vfox-moonbit
           permission-contents: write
           permission-pull-requests: write
+          permission-workflows: write
 
-      - name: Resolve updater identity and branch
+      - name: Resolve updater identity
         shell: bash
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
@@ -60,19 +82,6 @@ jobs:
           fi
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
-          branch="automation/maintenance-tooling"
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-            git fetch origin "$branch"
-            git switch -c "$branch" FETCH_HEAD
-            git merge origin/main --no-edit
-          else
-            git switch -c "$branch"
-          fi
-
-      - name: Refresh compatible versions and locks
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: mise run update:tooling
 
       - name: Enforce update allowlist and open one pull request
         shell: bash
@@ -81,11 +90,11 @@ jobs:
         run: |
           while IFS= read -r path; do
             case "$path" in
-              mise.lock|package.json|pnpm-lock.yaml|pnpm-workspace.yaml) ;;
+              .github/workflows/*.yml|lua-rocks.lock|mise.lock|package.json|pnpm-lock.yaml|pnpm-workspace.yaml) ;;
               *) echo "Tooling updater changed forbidden path: $path" >&2; exit 1 ;;
             esac
           done < <({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)
-          git add mise.lock package.json pnpm-lock.yaml pnpm-workspace.yaml
+          git add .github/workflows lua-rocks.lock mise.lock package.json pnpm-lock.yaml pnpm-workspace.yaml
           if ! git diff --cached --quiet; then
             git commit -m "chore: update maintenance tools within compatible ranges"
           fi
@@ -98,9 +107,9 @@ jobs:
           if [[ -z "$number" ]]; then
             body="$RUNNER_TEMP/tooling-pr-body.md"
             cat > "$body" <<'BODY'
-          Updates mise tools and npm dependencies together. The configured compatibility ranges are preserved, and Vite/Vitest/coverage versions are synchronized with Vite+. GitHub Actions follow their configured major tags.
+          Updates mise tools, npm dependencies, Lua test rocks, and full-length GitHub Action commit pins together. Configured compatibility ranges are preserved; Vite/Vitest/coverage versions stay synchronized; Lua rock recipes and source trees retain SHA-256 verification.
 
-          CI validates this update before merge. This PR is never auto-merged.
+          CI and dependency review validate this update before merge. This PR is never auto-merged, so the normal maintenance workload is one review of this weekly PR.
           BODY
             gh pr create --head "$branch" --base main \
               --title "chore: update maintenance tools" --body-file "$body"

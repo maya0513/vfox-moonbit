@@ -1,127 +1,124 @@
 # アーキテクチャ
 
-この文書では、現在の実装とテストで保証されている仕様を説明します。設計を変更する場合は、先に実装とテストを更新し、その結果をこの文書へ反映します。
+この文書では、現在のテストと実装で保証されている仕様を説明します。設計を変更する場合は、まずテストで仕様を定め、実装を合わせてからこの文書へ反映します。
 
 ## 公開契約
 
-vfoxで提供するチャンネルは`latest`だけです。`Available`は`releases/latest.json`を取得し、`0.x.y+build-id`形式の完全なバージョン番号を返します。`PreInstall`は`latest`または完全なバージョン番号だけを受け付け、対応する固定済みのmanifestから公式toolchainのURLとSHA-256を返します。
+vfoxで提供するチャンネルは`latest`だけです。`Available`は`releases/latest.json`を取得し、`0.x.y+build-id`形式の完全なバージョン番号を返します。`PreInstall`は`latest`または完全なバージョン番号だけを受け付け、対応する固定済みのマニフェストから公式ツールチェーンのURLとSHA-256を返します。
 
-完全なバージョン番号に対応するmanifestを、以下ではexact manifestと呼びます。schema version 1のexact manifestは`schema`、`recipe`、`version`と、次のplatformごとのrecordを持ちます。
+完全なバージョン番号に対応するマニフェストを、以下ではexact manifestと呼びます。スキーマバージョン1のexact manifestは`schema`、`recipe`、`version`と、次のプラットフォームごとのレコードを持ちます。
 
 - `linux-x86_64`
 - `linux-aarch64`
 - `darwin-aarch64`
 - `windows-x86_64`
 
-各recordには、`toolchain`と`core`それぞれの`url`、`sha256`、`format`を記録します。HTTP URLのpathに含まれる`+`は`%2B`へencodeします。既存のexact manifestは変更しません。schema versionはmanifest形式の互換性を、recipe versionはbundle手順やlayoutを含むインストール方式の互換性を表します。
+各レコードには、`toolchain`と`core`それぞれの`url`、`sha256`、`format`を記録します。HTTP URLのパスに含まれる`+`は`%2B`へエンコードします。既存のexact manifestは変更しません。スキーマバージョンはマニフェスト形式の互換性を、`recipe`のバージョンはバンドル手順やレイアウトを含むインストール方式の互換性を表します。
 
-## Plugin runtime
+## プラグインのランタイム
 
-配布物はLua 5.1で実行されます。hookは薄く保ち、`lib/moonbit_*.lua`を次の責務へ分けます。
+配布物はLua 5.1で実行されます。フックは薄く保ち、`lib/moonbit_*.lua`を次の責務へ分けます。
 
-| Module | 責務 |
+| モジュール | 責務 |
 | --- | --- |
-| `moonbit_manifest` | latest manifestとexact manifestの取得、version、schema、canonical CDN URLの検証 |
-| `moonbit_platform` | vfox/miseの実行context、OS/arch alias、path、対応hostの正規化 |
-| `moonbit_encoding` | UTF-16LE、Base64、PowerShell encoded command |
-| `moonbit_process` | shell quoting、Lua 5.1/5.4の終了status、command実行、安全なfilesystem操作 |
-| `moonbit_runtime` | platform、process、encodingを統合するruntime adapter |
-| `moonbit_files` | streaming copy、byte比較、atomicなshim生成に使うI/O、`moon.mod`の読取 |
-| `moonbit_core` | coreの検証と、昇格・確定・rollbackを行うtransaction |
-| `moonbit_prepare` | permission、bundle、`moonx`、LSP/IDE shim |
-| `moonbit_toolchain` | toolchainの検証後にcoreを準備する処理順序の制御 |
-| `moonbit_installer` | downloadからcleanupまでを含む`PostInstall`全体 |
+| `moonbit_manifest` | `latest`のマニフェストとexact manifestの取得、バージョン、スキーマ、正規のCDN URLの検証 |
+| `moonbit_platform` | vfox/miseの実行コンテキスト、OS・アーキテクチャのエイリアス、パス、対応ホストの正規化 |
+| `moonbit_encoding` | UTF-16LE、Base64、PowerShellのエンコード済みコマンド |
+| `moonbit_process` | シェルの引数のクォート、Lua 5.1/5.4の終了ステータス、コマンド実行、安全なファイルシステム操作 |
+| `moonbit_runtime` | プラットフォーム、プロセス、エンコード処理を統合するランタイムアダプター |
+| `moonbit_files` | ストリーミングコピー、バイト比較、アトミックなshim生成に使うI/O、`moon.mod`の読み取り |
+| `moonbit_core` | coreの検証と、昇格・確定・ロールバックを行うトランザクション |
+| `moonbit_prepare` | 権限、バンドル、`moonx`、LSP/IDE用のshim |
+| `moonbit_toolchain` | ツールチェーンの検証後にcoreを準備する処理順序の制御 |
+| `moonbit_installer` | ダウンロードから後始末までを含む`PostInstall`全体 |
 
-runtime adapterを介すことで、vfox objectの差分と依存注入を一か所に閉じ込めています。Windowsのfilesystem操作とbundleはUTF-16LE/Base64のPowerShell `-EncodedCommand`で実行し、pathをPowerShell内部で処理して`cmd.exe`のcommand lineから分離します。
+ランタイムアダプターを介すことで、vfoxオブジェクトの差分と依存注入を一か所に閉じ込めています。Windowsのファイルシステム操作とバンドルはUTF-16LE/Base64のPowerShell `-EncodedCommand`で実行し、パスをPowerShell内部で処理して`cmd.exe`のコマンドラインから分離します。
 
 ## インストール処理
 
-1. `PostInstall`が、`latest`から解決された完全なバージョン番号、host、Git、toolchainのlayoutを検証します。
-2. そのversionに対応するexact manifestを再取得します。これにより、`PreInstall`の後に`latest`が更新されても、toolchainとcoreは同じversionに揃います。
-3. coreのarchiveをinstall root内の`.part`へdownloadし、pure Lua SHA-256で検証します。
-4. 検証済みのarchiveだけをstageへ展開し、vfoxとmiseで異なるarchive最上位directoryの扱いを、二つの既知のlayoutへ正規化します。
-5. `moon.mod`のversionと`builtin/moon.pkg`を検証し、既存のcoreをbackupしてからstageを昇格します。
-6. permission、bundle、`moonx`、helper shimを準備します。一つでも失敗した場合は新しいcoreを隔離し、以前のcoreを復元します。
-7. 成功後にbackup、stage、archive、一時的なbundle用homeを削除します。
+1. `PostInstall`が、`latest`から解決された完全なバージョン番号、ホスト、Git、ツールチェーンのレイアウトを検証します。
+2. そのバージョンに対応するexact manifestを再取得します。これにより、`PreInstall`の後に`latest`が更新されても、ツールチェーンとcoreは同じバージョンに揃います。
+3. coreのアーカイブをインストール先ルート内の`.part`へダウンロードし、Luaだけで実装されたSHA-256で検証します。
+4. 検証済みのアーカイブだけをステージング領域へ展開し、vfoxとmiseで異なるアーカイブの最上位ディレクトリの扱いを、二つの既知のレイアウトへ正規化します。
+5. `moon.mod`のバージョンと`builtin/moon.pkg`を検証し、既存のcoreをバックアップしてからステージング領域を昇格します。
+6. 権限、バンドル、`moonx`、ヘルパー用のshimを準備します。一つでも失敗した場合は新しいcoreを隔離し、以前のcoreを復元します。
+7. 成功後にバックアップ、ステージング領域、アーカイブ、一時的なバンドル用ホームディレクトリを削除します。
 
-Lua 5.1では`pcall`をまたいでyieldできないため、yieldする可能性があるHTTP downloadとarchiverの呼び出しは`pcall`の外に置きます。cleanup対象はinstall root内の`.vfox-moonbit-*`に限定し、それより広いpathの再帰削除を拒否します。
+Lua 5.1では`pcall`をまたいで`yield`できないため、`yield`する可能性があるHTTPダウンロードとアーカイバーの呼び出しは`pcall`の外に置きます。後始末の対象はインストール先ルート内の`.vfox-moonbit-*`に限定し、それより広いパスの再帰削除を拒否します。
 
 ## 環境変数
 
-`EnvKeys`は`PATH=<root>/shims`、`PATH=<root>/bin`、`MOON_TOOLCHAIN_ROOT=<root>`を返します。可変状態を保持する`MOON_HOME`は呼び出し元が管理し、hookでは上書きしません。
+`EnvKeys`は`PATH=<root>/shims`、`PATH=<root>/bin`、`MOON_TOOLCHAIN_ROOT=<root>`を返します。可変状態を保持する`MOON_HOME`は呼び出し元が管理し、フックでは上書きしません。
 
-現在のnative `moon-lsp`と`moon-ide`は、coreの探索に`MOON_HOME`も必要とします。この二つのcommandに限り、shimがhelper process内の`MOON_HOME`と`MOON_TOOLCHAIN_ROOT`をinstall rootへ設定します。bundleでは、認証情報やregistryから隔離した一時的なhomeを使います。
+現在のネイティブ版`moon-lsp`と`moon-ide`は、coreの探索に`MOON_HOME`も必要とします。この二つのコマンドに限り、shimがヘルパープロセス内の`MOON_HOME`と`MOON_TOOLCHAIN_ROOT`をインストール先ルートへ設定します。バンドルでは、認証情報やレジストリから隔離した一時的なホームディレクトリを使います。
 
-Unixの`moonx`は`moon`への相対symlinkです。Windowsではhardlinkの作成を試し、失敗した場合だけstreaming copyへ切り替えてbyte単位の一致を検証します。
+Unixの`moonx`は`moon`への相対シンボリックリンクです。Windowsではハードリンクの作成を試し、失敗した場合だけストリーミングコピーへ切り替えてバイト単位の一致を検証します。
 
-## Updaterの信頼境界
+## アップデーターの信頼境界
 
-TypeScript updaterはdownloadしたarchiveを検査だけに使用します。download中に受信sizeとSHA-256を計算し、処理に使った一時fileは必ずcleanupします。
+TypeScript製アップデーターはダウンロードしたアーカイブを検査だけに使用します。ダウンロード中に受信サイズとSHA-256を計算し、処理に使った一時ファイルは必ず削除します。
 
-tar/ZIPの全memberを展開せずに走査し、絶対path、`..`、展開先の外を指すlink、deviceやFIFOなどのspecial file、暗号化ZIP、CRC不一致、大小文字を区別しないfilesystemでの名前衝突、member数、展開後size、必須layoutを検査します。
+tar/ZIPの全エントリを展開せずに走査し、絶対パス、`..`、展開先の外を指すリンク、デバイスファイルやFIFOなどの特殊ファイル、暗号化ZIP、CRC不一致、大小文字を区別しないファイルシステムでの名前衝突、エントリ数、展開後サイズ、必須レイアウトを検査します。
 
-全platformの成果物を取得した後に`latest`を再確認し、取得開始時のreleaseと一致することを検証します。結果とCLIの終了codeは次のとおりです。
+全プラットフォームの成果物を取得した後に`latest`を再確認し、取得開始時のリリースと一致することを検証します。結果とCLIの終了コードは次のとおりです。
 
-| 状態 | 扱い | 終了code |
+| 状態 | 扱い | 終了コード |
 | --- | --- | --- |
-| 一部のplatformが未公開 | 昇格せず、次回の実行まで延期 | `0` |
-| installer、layout、version schema、MoonBit 1.0への変更を検出 | manual reviewを要求 | `2` |
-| その他のerror | 実行失敗 | `1` |
+| 一部のプラットフォームが未公開 | 昇格せず、次回の実行まで延期 | `0` |
+| インストーラー、レイアウト、バージョンのスキーマ、MoonBit 1.0への変更を検出 | 手動レビューを要求 | `2` |
+| その他のエラー | 実行失敗 | `1` |
 
-scheduled GitHub Actions workflowは1日1回実行します。GitHub App tokenを使い、`releases/**`だけを変更するPRを作成して、required CIの成功後にauto-mergeします。`main`へは直接pushせず、既存のexact manifestに対する変更も拒否します。
+GitHub Actionsのワークフローは1日1回の定期実行です。GitHub Appのトークンを使い、`releases/**`だけを変更するPRを作成して、必須CIの成功後に自動マージします。`main`へは直接プッシュせず、既存のexact manifestに対する変更も拒否します。
 
 ## 開発・保守用ツール
 
-`pnpm vp run coverage`では、自作Lua runtimeの各fileの行カバレッジと、保守用TypeScriptの各fileの文・分岐・関数・行カバレッジを100%に保ちます。Lua checkerは表示された割合に加えて実行・未実行行数を確認し、丸めによる未実行行の見逃しを防ぎます。vendorのSHA実装と実ダウンロードを行うE2E harnessは従来どおり別途検証します。テストはローカルのarchive fixtureとI/O障害の注入を使い、危険なpath、downloadの上限、後始末、manifestの不変性、packageの再現性をupstreamへの通信なしで検証します。
+### テスト
 
-保守用のTypeScript CLIは、Node 24の型除去機能により事前のtranspileなしで直接実行します。Vite Taskはformat、lint、unit test、coverage、documentation検査、manifest検査、package作成の実行順序とcacheを管理します。cache対象のtaskでは入力fileからfingerprintを算出し、coverage結果と`dist`のpackageを生成物として復元します。networkや利用者のstateへ依存するE2E、upstream discovery、release操作はcacheの対象外です。
+`pnpm vp run coverage`では、自作Luaランタイムの各ファイルの行カバレッジと、保守用TypeScriptの各ファイルの文・分岐・関数・行カバレッジを100%に保ちます。Luaのチェッカーは表示された割合に加えて実行・未実行行数を確認し、丸めによる未実行行の見逃しを防ぎます。
 
-miseはNode、pnpm、Lua、LuaRocks、workflow検査toolの互換version範囲を指定し、解決したversionをmise.lockへ記録します。npm依存は互換範囲とpnpm-lock.yamlを使い、Vite core・Vitest・coverage providerはVite+に合わせて一緒に更新します。GitHub Actionsはmajor tagへ追従します。週次のmaintenance updaterがtoolと依存のlockを1件のPRにまとめて更新し、個別のDependabot version更新PRを置き換えます。major更新には明示的な範囲変更が必要です。`mise run bootstrap`はproject-localのVite+ CLIが使える前にNodeとLuaの依存を準備し、`mise run update:tooling`はtoolchain自体を更新します。miseに残すtaskはこの2件だけです。check、package、E2E、upstream discoveryはVite Taskだけに定義し、`pnpm vp run <task>`で実行します。環境はローカルのmise shell activationとCIのmise-actionで準備し、通常のtask呼び出しに`mise exec`を挟みません。repository checkerはowner、承認済みの依存範囲とworkflow参照、manifest、禁止されたPython関連fileの残存を検証します。documentation checkerはversion、command、platform、環境変数、local linkの記述を実装と照合します。
+テストはローカルのテスト用アーカイブとI/O障害の注入を使い、危険なパス、ダウンロードの上限、後始末、マニフェストの不変性、パッケージの再現性を配布元への通信なしで検証します。同梱した外部のSHA実装と実ダウンロードを行うE2Eテスト基盤は別途検証します。
 
-### 保守用コマンド
+Luaの大容量SHAテストベクトルはBusted標準の`#large`タグで分離します。カバレッジタスクでは通常テストを行追跡付きで実行した後、この2件だけを行追跡なしで実行し、計測の負荷とテストの重複を抑えます。Luaの起動設定は共通ランナーにまとめています。
 
-miseをshellで有効にしてから実行します。Luaを含む開発用セットアップは現在Linux x86_64前提です。
+### ツールの役割
 
-```shell
-mise install --locked
-mise run bootstrap
-pnpm vp run ci
-```
+保守用のTypeScript CLIは、Node 24の型除去機能により事前のトランスパイルなしで直接実行します。Vite Taskは検証とパッケージ作成の実行順序とキャッシュを管理します。
 
-| コマンド | 用途 |
-| --- | --- |
-| `mise run bootstrap` | npmの固定依存とLuaのテスト依存を準備 |
-| `mise run update:tooling` | 互換範囲内でtoolとnpm依存のlockを更新 |
-| `pnpm vp run fmt:check` / `pnpm vp run lint` | 整形と静的解析 |
-| `pnpm vp run test:unit` / `pnpm vp run coverage` | 単体テストと100%カバレッジ検証 |
-| `pnpm vp run docs:check` / `pnpm vp run update:check` | 文書とrelease manifestの検証 |
-| `pnpm vp run package` | 再現可能なプラグインpackageを生成 |
-| `pnpm vp run e2e` / `pnpm vp run e2e:vfox` | 実ダウンロードの統合テスト |
-| `pnpm vp run update:discover` | 完全なupstream MoonBit releaseを検出 |
-| `pnpm vp run ci` | 決定的な検証をまとめて実行。E2Eは別途実行 |
+miseは開発ツールの取得と環境の準備を担当します。プロジェクト内のVite+ CLIを導入する`bootstrap`と、ツール自体を更新する処理はmiseのタスクに置き、それ以外はVite Taskに集約します。
+
+### 依存のバージョン管理
+
+互換範囲は更新時の選択肢を、ロックファイルは通常のインストールで使う具体的なバージョンを指定します。ツールと依存はそれぞれのエコシステムに対応したロックファイルで管理し、mise本体だけは最新安定版との互換性確認を優先します。
+
+Viteのコア・Vitest・カバレッジプロバイダーはVite+との整合が必要なため、一緒に更新します。
+
+### 設定と文書の検査
+
+リポジトリチェッカーはオーナー、承認済みの依存範囲とワークフロー参照、マニフェスト、禁止されたPython関連ファイルの残存を検証します。ドキュメントチェッカーはバージョン、コマンド、プラットフォーム、環境変数、ローカルリンクの記述を実装と照合します。
 
 ## moonbit-overlayとの比較
 
-比較対象は[`moonbit-community/moonbit-overlay` commit `edbca087`](https://github.com/moonbit-community/moonbit-overlay/tree/edbca0874797c2ee227d4f9cc2b427747756717c)です。
+比較対象は[`moonbit-community/moonbit-overlay`のコミット`3adbe60d`](https://github.com/moonbit-community/moonbit-overlay/tree/3adbe60dcc6c4ee0e862173bb83418ee747d1784)（2026-10-05）です。
 
 | 観点 | vfox-moonbit | moonbit-overlay |
 | --- | --- | --- |
-| 管理方法 | mise / standalone vfox | Nix flake / overlay |
-| 環境の反映 | managerのshell activationまたはcommand環境で`EnvKeys`を反映 | dev shell、profile、wrapperで環境を反映 |
-| version | stableの`latest`とlock用の完全なversion | latest、nightly、過去version |
-| 配布元 | 公式CDNから直接取得し、再配布しない | hashを固定したarchiveをGitHub Releaseへmirror |
-| インストール | 可変なinstall rootに対するrollback可能なtransaction | immutableなNix storeの`symlinkJoin` |
-| 利用者のstate | 通常の`moon`では呼び出し元の`MOON_HOME`を維持 | 通常のbundleでは呼び出し元の`MOON_HOME`を維持 |
-| LSP / IDE | helper shimだけ`MOON_HOME`と`MOON_TOOLCHAIN_ROOT`をinstall rootへ設定 | helper wrapperだけ両変数をNix store rootへ設定 |
-| core bundle | 公式stable installerと同じ`--all`と`wasm-gc --quiet` | `--all`、`llvm`、`wasm-gc`を`--quiet`なしでbundle |
-| `moonx` | Unixは相対symlink、Windowsはhardlinkまたは検証付きcopy | Unix packageで`moon`への相対symlink |
+| 管理方法 | mise / 単体のvfox | Nix flake / オーバーレイ |
+| 対応環境 | Linux x86_64 / arm64（glibc）、macOS arm64、Windows x86_64 | flakeの公開対象はLinux x86_64、macOS arm64。各バージョンは対象環境のハッシュがある場合だけ公開 |
+| 環境の反映 | マネージャーのシェル有効化またはコマンド実行環境で`EnvKeys`を反映 | 開発シェル、プロファイル、ラッパーで環境を反映。`moon`のラッパーが`PATH`と`MOON_TOOLCHAIN_ROOT`を設定し、`nix run`でもヘルパーを発見 |
+| バージョン | 安定版の`latest`と固定用の完全なバージョン | `latest`、`nightly`、日付付きnightly、0.10.0以降の過去バージョン |
+| 配布元 | 公式CDNから直接取得し、再配布しない | ハッシュを固定したアーカイブをGitHub Releaseへミラー |
+| インストール | 可変なインストール先ルートに対するロールバック可能なトランザクション | 変更不可なNixストアの`symlinkJoin` |
+| 利用者の状態 | 通常の`moon`では呼び出し元の`MOON_HOME`を維持 | 通常のバンドルでは呼び出し元の`MOON_HOME`を維持 |
+| LSP / IDE | ヘルパー用のshimが両変数をインストール先ルートへ上書き | ヘルパー用のラッパーが`MOON_TOOLCHAIN_ROOT`を設定。`MOON_HOME`は利用者指定を優先し、未設定時だけNixストアのルートを使用 |
+| coreのバンドル | 公式の安定版インストーラーと同じ`--all`と`wasm-gc --quiet` | `--all`、`llvm`、`wasm-gc`を`-v`付き、`--quiet`なしでバンドル |
+| `moonx` | Unixは相対シンボリックリンク、Windowsはハードリンクまたは検証付きコピー | Unixパッケージで`moon`への相対シンボリックリンク |
 | Linux | 公式ELFを変更しない | `autoPatchelfHook`と`tinycc`置換 |
-| project build | toolchainの提供のみ | `buildMoonPackage`とregistry cacheも提供 |
+| プロジェクトのビルド | ツールチェーンの提供のみ | ツールチェーンの提供のみ。プロジェクトビルドとMooncakes依存のパッケージ化はmoon2nixへ移管 |
 
-stable向けの[公式Unix installer](https://cli.moonbitlang.com/install/unix.sh)と[PowerShell installer](https://cli.moonbitlang.com/install/powershell.ps1)のbundle対象は`--all`と`wasm-gc`です。LLVM bundleはnightlyでのみ実行されます。そのため、[overlayの常時LLVM bundle](https://github.com/moonbit-community/moonbit-overlay/blob/edbca0874797c2ee227d4f9cc2b427747756717c/lib/bundle.nix)には揃えず、公式のstable recipeを優先します。
+安定版向けの[公式Unixインストーラー](https://cli.moonbitlang.com/install/unix.sh)と[PowerShellインストーラー](https://cli.moonbitlang.com/install/powershell.ps1)のバンドル対象は`--all`と`wasm-gc`です。LLVMバンドルは`nightly`でのみ実行されます。そのため、[オーバーレイの常時LLVMバンドル](https://github.com/moonbit-community/moonbit-overlay/blob/3adbe60dcc6c4ee0e862173bb83418ee747d1784/lib/bundle.nix)には揃えず、公式の安定版のインストール手順を優先します。
 
-Nix固有のpatch、artifact mirror、nightly、過去versionの一覧、project builderは、このpluginの対象外です。
+同じ実装で、overlayのヘルパーは`--set-default MOON_HOME`により利用者指定を優先します。本プラグインは選択中のcoreを確実に参照させるため、ヘルパープロセス内だけ両変数を上書きする動作を維持します。プロジェクトビルドの移管先は[moon2nix](https://github.com/moonbit-community/moon2nix)です。
 
 ## 参考にした実装
 
-設計にあたり、[moonup](https://github.com/chawyehsu/moonup)を参考実装として調査しました。moonupがtoolchainの取得、versionの選択、環境の切り替えを一体で提供するのに対し、このpluginではversionの選択と環境の切り替えをmise/vfoxに委ね、toolchainとcoreを整合する組み合わせで導入します。
+設計にあたり、[moonup](https://github.com/chawyehsu/moonup)を参考実装として調査しました。moonupがツールチェーンの取得、バージョンの選択、環境の切り替えを一体で提供するのに対し、このプラグインではバージョンの選択と環境の切り替えをmise/vfoxに委ね、ツールチェーンとcoreを整合する組み合わせで導入します。
