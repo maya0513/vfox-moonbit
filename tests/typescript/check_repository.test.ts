@@ -91,8 +91,18 @@ async function makeMaintenanceConfiguration(root: string): Promise<void> {
     'tsconfig.json',
     'vite.config.ts',
     'vite.tasks.ts',
+    'lua-rocks.lock',
+    'scripts/update-tooling.sh',
   ]) {
+    await mkdir(dirname(join(root, name)), { recursive: true });
     await copyFile(join(REPOSITORY, name), join(root, name));
+  }
+  await mkdir(join(root, '.github', 'workflows'), { recursive: true });
+  for (const name of ['ci.yml', 'update-tooling.yml']) {
+    await copyFile(
+      join(REPOSITORY, '.github', 'workflows', name),
+      join(root, '.github', 'workflows', name),
+    );
   }
 }
 
@@ -161,7 +171,7 @@ describe('release and Actions policy', () => {
     await expect(checkReleasePolicy(temporary)).rejects.toThrow('exceeds');
   });
 
-  it('requires workflows and action major tags or full commit pins', async () => {
+  it('requires workflows and full commit pins with major tag comments', async () => {
     await expect(workflowFiles(temporary)).resolves.toEqual([]);
     await mkdir(join(temporary, '.github', 'workflows'), { recursive: true });
     await expect(checkActions(temporary)).rejects.toThrow('no GitHub Actions');
@@ -170,12 +180,17 @@ describe('release and Actions policy', () => {
       'ci.yml',
       'steps:\n  - uses: ./local\n  - uses: actions/checkout@main\n',
     );
-    await expect(checkActions(temporary)).rejects.toThrow('major tag or full commit');
+    await expect(checkActions(temporary)).rejects.toThrow('full commit SHA');
     await writeFile(workflow, 'steps:\n  - uses: ./local\n  - uses: actions/checkout@v7\n');
-    await expect(checkActions(temporary)).resolves.toBeUndefined();
+    await expect(checkActions(temporary)).rejects.toThrow('full commit SHA');
     await writeFile(
       workflow,
       `steps:\n  - uses: ./local\n  - uses: actions/checkout@${'a'.repeat(40)}\n`,
+    );
+    await expect(checkActions(temporary)).rejects.toThrow('major tag comments');
+    await writeFile(
+      workflow,
+      `steps:\n  - uses: ./local\n  - uses: actions/checkout@${'a'.repeat(40)} # v7\n`,
     );
     await expect(checkActions(temporary)).resolves.toBeUndefined();
   });
@@ -204,29 +219,62 @@ describe('release and Actions policy', () => {
     );
     await expect(checkUpdaterWorkflow(temporary)).rejects.toThrow('incomplete GitHub App');
   });
+
+  it('requires latest-stable mise selection and logs the actual version', async () => {
+    const original = await readFile(join(REPOSITORY, '.github/workflows/ci.yml'), 'utf8');
+    const path = await makeWorkflow(temporary, 'ci.yml', original);
+    await expect(checkActions(temporary)).resolves.toBeUndefined();
+    for (const changed of [
+      original.replace('minimum_release_age: "0s"', 'minimum_release_age: "24h"'),
+      original.replace('cache: false', 'cache: true'),
+      original.replace('install: false', 'version: "2026.10.3"\n          install: false'),
+    ]) {
+      await writeFile(path, changed);
+      await expect(checkActions(temporary)).rejects.toThrow('latest stable mise');
+    }
+    await writeFile(path, original.replace('run: mise --version', 'run: echo missing'));
+    await expect(checkActions(temporary)).rejects.toThrow('actual mise version');
+  });
 });
 
 describe('Node maintenance tooling policy', () => {
+  it('keeps pnpm version ownership in mise instead of package-manager self-management', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    const packagePath = join(temporary, 'package.json');
+    const original = await readFile(packagePath, 'utf8');
+    const document = JSON.parse(original);
+    for (const change of [
+      { engines: { node: '24.x', pnpm: '13.x' } },
+      { packageManager: 'pnpm@12.9.1' },
+      { devEngines: { packageManager: { name: 'pnpm', version: '12.x', onFail: 'download' } } },
+    ]) {
+      await writeFile(packagePath, JSON.stringify({ ...document, ...change }));
+      await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('mise-managed pnpm');
+    }
+    await writeFile(packagePath, original);
+    const lockPath = join(temporary, 'pnpm-lock.yaml');
+    const lock = await readFile(lockPath, 'utf8');
+    await writeFile(lockPath, `${lock}\npackageManagerDependencies: {}\n`);
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('locked only in mise.lock');
+    await writeFile(lockPath, lock);
+    const updaterPath = join(temporary, 'scripts/update-tooling.sh');
+    const updater = await readFile(updaterPath, 'utf8');
+    for (const command of ['pnpm self-update', 'pnpm env use']) {
+      await writeFile(updaterPath, `${updater}\n${command}\n`);
+      await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('pnpm only through mise');
+    }
+  });
+
   it('allows dependency updates within the selected major', async () => {
     await makeMaintenanceConfiguration(temporary);
     const packagePath = join(temporary, 'package.json');
     const packageText = await readFile(packagePath, 'utf8');
     await writeFile(packagePath, packageText.replace(/"tar": "[^"]+"/, '"tar": "^7.99.0"'));
-    await makeWorkflow(
-      temporary,
-      'ci.yml',
-      'uses: actions/cache/restore@v6\nuses: actions/cache/save@v6\npath: node_modules/.vite/task-cache\n',
-    );
     await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
   });
 
   it('ignores deleted tracked files while validating the present repository', async () => {
     await makeMaintenanceConfiguration(temporary);
-    await makeWorkflow(
-      temporary,
-      'ci.yml',
-      'uses: actions/cache/restore@v6\nuses: actions/cache/save@v6\npath: node_modules/.vite/task-cache\n',
-    );
     const runGit = promisify(execFile);
     await writeFile(join(temporary, 'removed.py'), 'obsolete');
     await runGit('git', ['init', temporary]);
@@ -237,19 +285,12 @@ describe('Node maintenance tooling policy', () => {
 
   it('accepts pinned Node/Vite+ configuration and rejects Python remnants', async () => {
     await makeMaintenanceConfiguration(temporary);
-    await makeWorkflow(
-      temporary,
-      'ci.yml',
-      `steps:\n  - uses: actions/cache/restore@${'a'.repeat(40)}\n    with:\n      path: node_modules/.vite/task-cache\n  - uses: actions/cache/save@${'b'.repeat(40)}\n`,
-    );
     await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
     await writeFile(join(temporary, 'tool.py'), 'print(1)');
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Python maintenance files');
     await rm(join(temporary, 'tool.py'));
-    await writeFile(
-      join(temporary, '.github', 'workflows', 'ci.yml'),
-      'uses: actions/cache/restore@ref\nuses: actions/cache/save@ref\npath: node_modules/.vite/task-cache\nrun: python tool.py\n',
-    );
+    const ciPath = join(temporary, '.github', 'workflows', 'ci.yml');
+    await writeFile(ciPath, `${await readFile(ciPath, 'utf8')}\nrun: python tool.py\n`);
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('forbidden Python tooling');
   });
 
@@ -274,6 +315,8 @@ describe('Node maintenance tooling policy', () => {
     const workspaceText = await readFile(workspacePath, 'utf8');
     await writeFile(workspacePath, workspaceText.replace('vitest@*', 'vitest'));
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Vite/Vitest overrides');
+    await writeFile(workspacePath, workspaceText.replace("    vite: '1'", "    vite: '*'"));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('peer policy');
     await writeFile(workspacePath, workspaceText);
 
     await writeFile(join(temporary, '.gitattributes'), '* text=auto\n');
@@ -292,13 +335,51 @@ describe('Node maintenance tooling policy', () => {
     await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Node.js and pnpm');
   });
 
+  it('accepts Lua tooling without a project rockspec', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
+  });
+
+  it('enforces hashed Lua rocks and the weekly updater contract', async () => {
+    await makeMaintenanceConfiguration(temporary);
+    const lockPath = join(temporary, 'lua-rocks.lock');
+    const lock = await readFile(lockPath, 'utf8');
+    await writeFile(lockPath, lock.replace(/busted 2\./, 'busted 3.'));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('approved busted series');
+    await writeFile(lockPath, lock.replace(/[0-9a-f]{64}/, 'bad'));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('source hash');
+    await writeFile(lockPath, lock.replace(/^luacheck .*\n/m, ''));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('approved luacheck series');
+    const record = lock.split('\n').find((line) => line.startsWith('busted '));
+    await writeFile(lockPath, `${lock}\n${record}\n`);
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('duplicate Lua rock');
+    await writeFile(lockPath, lock);
+
+    const workflowPath = join(temporary, '.github', 'workflows', 'update-tooling.yml');
+    const workflow = await readFile(workflowPath, 'utf8');
+    await writeFile(workflowPath, workflow.replace('permission-workflows: write', ''));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('tooling updater');
+    await writeFile(workflowPath, workflow);
+
+    const updaterPath = join(temporary, 'scripts', 'update-tooling.sh');
+    const updater = await readFile(updaterPath, 'utf8');
+    await writeFile(
+      updaterPath,
+      updater.replace(
+        'mise install --locked node pnpm conda:gcc conda:lua conda:luarocks',
+        'mise install --locked node pnpm conda:gcc conda:lua',
+      ),
+    );
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Lua lock-generation tool');
+  });
+
   it.each([
     ['tsconfig.json', '[]', 'strict erasable Node'],
     ['tsconfig.json', '{"compilerOptions":null}', 'strict erasable Node'],
     ['vite.config.ts', 'export default {}', 'cached task graph'],
     ['vite.tasks.ts', 'export const tasks = {}', 'must define maintenance task'],
     ['vite.tasks.ts', 'cache: false', 'must define maintenance task'],
-    ['.github/workflows/ci.yml', 'steps: []', 'restore and save'],
+    ['.github/workflows/ci.yml', 'steps: []', 'dependency review'],
   ])('rejects invalid %s configuration: %s', async (name, text, message) => {
     await makeMaintenanceConfiguration(temporary);
     await makeWorkflow(temporary, 'ci.yml', 'steps: []');

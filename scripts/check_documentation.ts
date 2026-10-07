@@ -80,15 +80,20 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     'SECURITY.md',
     'docs/ARCHITECTURE.md',
     'docs/ARCHITECTURE.ja.md',
+    'docs/CI.md',
+    'docs/CI.ja.md',
   ] as const;
-  const [metadata, mise, readme, readmeJa, architecture, architectureJa] = await Promise.all([
-    parseMetadata(join(repository, 'metadata.lua')),
-    readFile(join(repository, 'mise.toml'), 'utf8'),
-    readFile(join(repository, 'README.md'), 'utf8'),
-    readFile(join(repository, 'README.ja.md'), 'utf8'),
-    readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
-    readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
-  ]);
+  const [metadata, mise, readme, readmeJa, architecture, architectureJa, ci, ciJa] =
+    await Promise.all([
+      parseMetadata(join(repository, 'metadata.lua')),
+      readFile(join(repository, 'mise.toml'), 'utf8'),
+      readFile(join(repository, 'README.md'), 'utf8'),
+      readFile(join(repository, 'README.ja.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'ARCHITECTURE.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'ARCHITECTURE.ja.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'CI.md'), 'utf8'),
+      readFile(join(repository, 'docs', 'CI.ja.md'), 'utf8'),
+    ]);
   // parseMetadata requires the version string before returning.
   const pluginVersion = String(metadata.version);
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
@@ -114,20 +119,39 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
       throw new DocumentationError(`${name} exposes the machine-only version probe`);
     }
   }
-  for (const [name, document] of [
-    ['docs/ARCHITECTURE.md', architecture],
-    ['docs/ARCHITECTURE.ja.md', architectureJa],
+  for (const [name, document, llvmBundle] of [
+    ['docs/ARCHITECTURE.md', architecture, 'LLVM bundle'],
+    ['docs/ARCHITECTURE.ja.md', architectureJa, 'LLVMバンドル'],
   ] as const) {
     requireText(
       document,
-      'edbca0874797c2ee227d4f9cc2b427747756717c',
+      '3adbe60dcc6c4ee0e862173bb83418ee747d1784',
       `${name} moonbit-overlay comparison revision`,
     );
-    requireText(document, 'LLVM bundle', `${name} intentional LLVM bundle difference`);
+    requireText(document, llvmBundle, `${name} intentional LLVM bundle difference`);
     for (const platform of ['linux-x86_64', 'linux-aarch64', 'darwin-aarch64', 'windows-x86_64']) {
       requireText(document, platform, `${name} platform ${platform}`);
     }
   }
+  for (const [name, document, commitSha] of [
+    ['docs/CI.md', ci, 'full-length commit SHA'],
+    ['docs/CI.ja.md', ciJa, '省略しないコミットSHA'],
+  ] as const) {
+    requireText(document, '.github/workflows/ci.yml', `${name} pull request workflow`);
+    requireText(document, '.github/workflows/update-latest.yml', `${name} MoonBit updater`);
+    requireText(document, '.github/workflows/update-tooling.yml', `${name} tooling updater`);
+    requireText(document, '.github/workflows/release.yml', `${name} release workflow`);
+    requireText(document, 'MOONBIT_UPDATER_CLIENT_ID', `${name} GitHub App client ID`);
+    requireText(document, 'MOONBIT_UPDATER_PRIVATE_KEY', `${name} GitHub App private key`);
+    requireText(document, commitSha, `${name} immutable Action references`);
+    requireText(document, 'lua-rocks.lock', `${name} verified Lua dependencies`);
+    requireText(document, 'Workflows write', `${name} GitHub App workflow permission`);
+    requireText(document, 'engines.pnpm', `${name} mise-managed pnpm policy`);
+    requireText(document, 'minimum_release_age: "0s"', `${name} latest-stable mise policy`);
+    requireText(document, 'mise --version', `${name} actual mise version log`);
+  }
+  requireText(ci, 'weekly PR', 'docs/CI.md weekly maintenance review');
+  requireText(ciJa, '週1回', 'docs/CI.ja.md weekly maintenance review');
   const availableTasks = {
     mise: miseTasks(mise),
     vite: viteTasks(await readFile(join(repository, 'vite.tasks.ts'), 'utf8')),
@@ -137,6 +161,8 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
     readmeJa,
     architecture,
     architectureJa,
+    ci,
+    ciJa,
     await readFile(join(repository, 'SECURITY.md'), 'utf8'),
   ];
   for (const runner of ['mise', 'vite'] as const) {

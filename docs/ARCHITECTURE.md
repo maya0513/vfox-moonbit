@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the guarantees enforced by the current implementation and tests. When changing the design, update the implementation and tests first, then reflect the result here.
+This document describes the guarantees enforced by the current tests and implementation. When changing the design, define the specification through tests first, bring the implementation into alignment, then reflect the result here.
 
 ## Public contract
 
@@ -72,55 +72,52 @@ The scheduled GitHub Actions workflow runs once a day. It uses a GitHub App toke
 
 ## Development and maintenance tools
 
-`pnpm vp run coverage` requires 100% line coverage for each first-party Lua runtime file and 100% statements, branches, functions, and lines for each maintenance TypeScript file. The Lua checker uses hit/miss counts as well as reported percentages, so rounding cannot hide missed lines. Vendored SHA code and the real-download E2E harness retain their separate checks. Tests use local archive fixtures and injected I/O failures to validate unsafe paths, bounded downloads, cleanup, immutable manifests, and deterministic packages without contacting upstream services.
+### Tests
 
-Maintenance TypeScript CLIs run directly through Node 24 type stripping without prior transpilation. Vite Task manages execution order and caching for formatting, linting, unit tests, coverage, documentation checks, manifest checks, and package creation. Cacheable tasks derive fingerprints from their input files and restore coverage results and the package under `dist`. E2E tests, upstream discovery, and release operations depend on the network or user state and are excluded from caching.
+`pnpm vp run coverage` requires 100% line coverage for each first-party Lua runtime file and 100% statements, branches, functions, and lines for each maintenance TypeScript file. The Lua checker uses hit/miss counts as well as reported percentages, so rounding cannot hide missed lines.
 
-mise selects compatible version ranges for Node, pnpm, Lua, LuaRocks, and workflow inspection tools; mise.lock records the resolved versions. npm dependencies use compatible ranges and pnpm-lock.yaml, while the Vite core, Vitest runner, and coverage provider stay aligned with Vite+. GitHub Actions follow major tags. The weekly maintenance updater refreshes the tool and dependency locks in one pull request, replacing individual Dependabot version-update PRs. Major upgrades require an explicit range change. `mise run bootstrap` prepares locked Node and Lua dependencies before the project-local Vite+ CLI is available; `mise run update:tooling` refreshes the toolchain itself. These are the only mise tasks. All checks, packaging, E2E, and upstream discovery are defined only in Vite Task and run through `pnpm vp run <task>`. Shell activation locally and mise-action in CI provide the tool environment; ordinary task calls do not use `mise exec`. The repository checker validates ownership, approved dependency ranges and workflow references, manifests, and the absence of prohibited Python files. The documentation checker compares documented versions, commands, platforms, environment variables, and local links with the implementation.
+Tests use local archive fixtures and injected I/O failures to validate unsafe paths, bounded downloads, cleanup, immutable manifests, and deterministic packages without contacting upstream services. Vendored SHA code and the real-download E2E harness have separate checks.
 
-### Maintenance commands
+Large Lua SHA vectors use Busted's standard `#large` tag. The coverage task runs regular tests with line tracing, then only these two cases without tracing, avoiding excessive instrumentation overhead and duplicate tests. A shared runner centralizes Lua startup settings.
 
-Activate mise in your shell before running these commands. Full Lua test setup currently requires Linux x86_64.
+### Tool responsibilities
 
-```shell
-mise install --locked
-mise run bootstrap
-pnpm vp run ci
-```
+Maintenance TypeScript CLIs run directly through Node 24 type stripping without prior transpilation. Vite Task manages execution order and caching for checks and packaging.
 
-| Command | Purpose |
-| --- | --- |
-| `mise run bootstrap` | Install frozen npm dependencies and locked Lua test dependencies |
-| `mise run update:tooling` | Refresh compatible tool and npm dependency locks |
-| `pnpm vp run fmt:check` / `pnpm vp run lint` | Formatting and static analysis |
-| `pnpm vp run test:unit` / `pnpm vp run coverage` | Unit tests and complete coverage |
-| `pnpm vp run docs:check` / `pnpm vp run update:check` | Documentation and release-manifest validation |
-| `pnpm vp run package` | Generate the deterministic plugin package |
-| `pnpm vp run e2e` / `pnpm vp run e2e:vfox` | Real-download integration tests |
-| `pnpm vp run update:discover` | Discover a complete upstream MoonBit release |
-| `pnpm vp run ci` | Run deterministic checks together; E2E runs separately |
+mise installs development tools and prepares the environment. Bootstrapping the project-local Vite+ CLI and updating the tools themselves remain mise tasks; all other tasks are consolidated in Vite Task.
+
+### Dependency version management
+
+Compatibility ranges determine the choices available during updates; locks specify the concrete versions used for ordinary installation. Tools and dependencies use locks appropriate to their ecosystems, with mise itself as the sole exception to prioritize latest-stable compatibility checks.
+
+The Vite core, Vitest runner, and coverage provider must stay aligned with Vite+ and are updated together.
+
+### Configuration and documentation checks
+
+The repository checker validates ownership, approved dependency ranges and workflow references, manifests, and the absence of prohibited Python files. The documentation checker compares documented versions, commands, platforms, environment variables, and local links with the implementation.
 
 ## Comparison with moonbit-overlay
 
-The comparison target is [`moonbit-community/moonbit-overlay` commit `edbca087`](https://github.com/moonbit-community/moonbit-overlay/tree/edbca0874797c2ee227d4f9cc2b427747756717c).
+The comparison target is [`moonbit-community/moonbit-overlay` commit `3adbe60d`](https://github.com/moonbit-community/moonbit-overlay/tree/3adbe60dcc6c4ee0e862173bb83418ee747d1784) (2026-10-05).
 
 | Aspect | vfox-moonbit | moonbit-overlay |
 | --- | --- | --- |
 | Management | mise / standalone vfox | Nix flake / overlay |
-| Environment application | `EnvKeys` applied through manager shell activation or command environment | Environment applied through a dev shell, profile, or wrapper |
-| Version | Stable `latest` and exact versions used for locking | Latest, nightly, and historical versions |
+| Supported platforms | Linux x86_64 / arm64 (glibc), macOS arm64, Windows x86_64 | The flake exposes Linux x86_64 and macOS arm64; each version is exposed only when a hash exists for the target platform |
+| Environment application | `EnvKeys` applied through manager shell activation or command environment | Environment applied through a dev shell, profile, or wrapper; the `moon` wrapper sets `PATH` and `MOON_TOOLCHAIN_ROOT` so helpers are discoverable even through `nix run` |
+| Version | Stable `latest` and exact versions used for locking | Latest, nightly, dated nightly snapshots, and historical versions from 0.10.0 onward |
 | Distribution source | Downloaded directly from the official CDN without redistribution | Hash-pinned archives mirrored to GitHub Releases |
 | Installation | Rollback-capable transaction into a mutable installation root | `symlinkJoin` in the immutable Nix store |
 | User state | Normal `moon` commands retain the caller's `MOON_HOME` | Normal bundles retain the caller's `MOON_HOME` |
-| LSP / IDE | Only helper shims set `MOON_HOME` and `MOON_TOOLCHAIN_ROOT` to the installation root | Only helper wrappers set both variables to the Nix store root |
-| Core bundle | Same `--all` and `wasm-gc --quiet` commands as the official stable installer | Bundles `--all`, `llvm`, and `wasm-gc` without `--quiet` |
+| LSP / IDE | Helper shims override both variables with the installation root | Helper wrappers set `MOON_TOOLCHAIN_ROOT`; `MOON_HOME` retains the caller's value and defaults to the Nix store root only when unset |
+| Core bundle | Same `--all` and `wasm-gc --quiet` commands as the official stable installer | Bundles `--all`, `llvm`, and `wasm-gc` with `-v` and without `--quiet` |
 | `moonx` | Relative symlink on Unix; hardlink or verified copy on Windows | Relative symlink to `moon` in the Unix package |
 | Linux | Leaves the official ELF files unchanged | Uses `autoPatchelfHook` and replaces `tinycc` |
-| Project builds | Provides only the toolchain | Also provides `buildMoonPackage` and a registry cache |
+| Project builds | Provides only the toolchain | Provides only the toolchain; project builds and Mooncakes dependency packaging have moved to moon2nix |
 
-The [official Unix installer](https://cli.moonbitlang.com/install/unix.sh) and [PowerShell installer](https://cli.moonbitlang.com/install/powershell.ps1) bundle `--all` and `wasm-gc` for stable releases. LLVM bundling is performed only for nightly releases. This plugin therefore follows the official stable recipe rather than matching the [overlay's unconditional LLVM bundle](https://github.com/moonbit-community/moonbit-overlay/blob/edbca0874797c2ee227d4f9cc2b427747756717c/lib/bundle.nix).
+The [official Unix installer](https://cli.moonbitlang.com/install/unix.sh) and [PowerShell installer](https://cli.moonbitlang.com/install/powershell.ps1) bundle `--all` and `wasm-gc` for stable releases. LLVM bundling is performed only for nightly releases. This plugin therefore follows the official stable recipe rather than matching the [overlay's unconditional LLVM bundle](https://github.com/moonbit-community/moonbit-overlay/blob/3adbe60dcc6c4ee0e862173bb83418ee747d1784/lib/bundle.nix).
 
-Nix-specific patching, artifact mirroring, nightly releases, historical version listings, and project builders are outside this plugin's scope.
+In the same implementation, overlay helpers use `--set-default MOON_HOME` to honor caller-provided values. This plugin retains its overrides of both variables inside helper processes to ensure they use the selected core. Project builds have moved to [moon2nix](https://github.com/moonbit-community/moon2nix).
 
 ## Reference implementation
 

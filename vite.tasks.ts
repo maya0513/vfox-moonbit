@@ -48,17 +48,18 @@ export const tasks = {
       'vp fmt --check',
     ],
     cache: {
-      input: [...luaSources, ...typescriptSources],
+      input: [...luaSources, ...typescriptSources, '.gitignore', '.gitattributes'],
       output: [],
     },
   },
   lint: {
     command: [
       "bash -c '.rocks/5.1/bin/luacheck metadata.lua hooks lib/moonbit_*.lua tests/lua'",
-      'vp check',
+      'vp lint',
+      'pnpm peers check',
+      "bash -c 'shellcheck scripts/*.sh'",
       "bash -c 'actionlint .github/workflows/*.yml'",
       'zizmor --pedantic .github/workflows',
-      'node scripts/check_repository.ts',
     ],
     cache: {
       input: repositoryPolicyInputs,
@@ -68,14 +69,14 @@ export const tasks = {
   'test:unit': {
     command: 'bash scripts/test-unit.sh',
     cache: {
-      input: [...luaSources, ...typescriptSources, 'scripts/test-unit.sh'],
+      input: repositoryPolicyInputs,
       output: [],
     },
   },
   coverage: {
     command: 'bash scripts/coverage.sh',
     cache: {
-      input: [...luaSources, ...typescriptSources, 'scripts/coverage.sh'],
+      input: repositoryPolicyInputs,
       output: ['coverage/**', 'luacov.report.out', 'luacov.stats.out'],
     },
   },
@@ -112,20 +113,13 @@ export const tasks = {
     command: 'node scripts/update_latest.ts',
     cache: false,
   },
+  check: {
+    command: [],
+    dependsOn: ['fmt:check', 'lint', 'coverage'],
+  },
   ci: {
-    command: 'git diff --check',
-    dependsOn: [
-      'fmt:check',
-      'lint',
-      'test:unit',
-      'coverage',
-      'docs:check',
-      'update:check',
-      'package',
-    ],
-    cache: {
-      input: repositoryPolicyInputs,
-      output: [],
-    },
+    command: ['node scripts/check_repository.ts', 'git diff --check'],
+    dependsOn: ['check', 'docs:check', 'update:check', 'package'],
+    cache: false,
   },
 };

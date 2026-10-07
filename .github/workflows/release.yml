@@ -22,17 +22,21 @@ jobs:
       artifact-metadata: write # Register attested artifact metadata with GitHub.
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install configured development tools
-        uses: jdx/mise-action@v5 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
           install: false
           cache: false
           experimental: true
+
+      - name: Record mise version
+        run: mise --version
 
       - name: Install locked development tools
         env:
@@ -52,7 +56,7 @@ jobs:
           pnpm vp run package --version "$version" --output dist
 
       - name: Attest the plugin ZIP
-        uses: actions/attest@v4 # zizmor: ignore[unpinned-uses] -- Follow compatible major releases.
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: dist/vfox-moonbit-*.zip
 
