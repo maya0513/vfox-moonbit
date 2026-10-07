@@ -34,7 +34,7 @@ CI uses the latest stable mise; the minimum supported mise version is 2026.10.3.
 Add the plugin from its GitHub Release:
 
 ```shell
-vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v0.1.4/vfox-moonbit-0.1.4.zip moonbit
+vfox add --source https://github.com/maya0513/vfox-moonbit/releases/download/v1.0.0/vfox-moonbit-1.0.0.zip moonbit
 vfox install --yes moonbit@latest
 vfox use moonbit@latest
 moon version

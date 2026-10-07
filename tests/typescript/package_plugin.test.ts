@@ -28,7 +28,7 @@ import {
   releaseFiles,
 } from '../../scripts/package_plugin.ts';
 
-const PLUGIN_VERSION = '0.1.4';
+const PLUGIN_VERSION = '1.0.0';
 const execFileAsync = promisify(execFile);
 let temporary: string;
 
