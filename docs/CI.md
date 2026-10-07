@@ -138,6 +138,7 @@ The repository requires the following Actions configuration:
 | --- | --- | --- |
 | Variable | `MOONBIT_UPDATER_CLIENT_ID` | Client ID of the repository-specific GitHub App |
 | Secret | `MOONBIT_UPDATER_PRIVATE_KEY` | Private key used to mint an App token |
+| Repository setting | Dependency graph | Required for the pull-request dependency review; enable under Settings → Advanced Security |
 | Repository setting | Allow auto-merge | Squash-merges a MoonBit latest PR after required CI succeeds |
 | Ruleset | Required check `required` | Prevents merging when any CI group fails |
 

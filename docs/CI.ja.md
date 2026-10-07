@@ -138,6 +138,7 @@ CI失敗や緊急の脆弱性、配布元の仕様変更には随時対応する
 | --- | --- | --- |
 | Variable | `MOONBIT_UPDATER_CLIENT_ID` | リポジトリ専用GitHub AppのクライアントID |
 | Secret | `MOONBIT_UPDATER_PRIVATE_KEY` | Appトークン生成に使う秘密鍵 |
+| Repository setting | Dependency graph | PRの依存関係レビューに必要。Settings → Advanced Securityで有効化 |
 | Repository setting | Allow auto-merge | MoonBitの最新版PRを必須CI成功後にスカッシュマージ |
 | Ruleset | Required check `required` | CIグループが一つでも失敗した変更のマージを防止 |
 
