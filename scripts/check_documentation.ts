@@ -98,7 +98,7 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
   const pluginVersion = String(metadata.version);
   const miseVersion = capture(mise, /^min_version\s*=\s*"([^"]+)"$/m, 'mise version');
   const vfoxVersion = capture(mise, /^vfox\s*=\s*"([^"]+)"$/m, 'vfox version');
-  const vfoxSeries = /^\d+$/.test(vfoxVersion) ? `${vfoxVersion}.x` : vfoxVersion;
+  const vfoxSeries = `${vfoxVersion.split('.')[0]}.x`;
   const projectToolSpec = `mise use 'vfox:${EXPECTED_REPOSITORY}@latest'`;
   const projectConfigSpec = `"vfox:${EXPECTED_REPOSITORY}" = "latest"`;
   const releaseUrl = `https://github.com/${EXPECTED_REPOSITORY}/releases/download/v${pluginVersion}/vfox-moonbit-${pluginVersion}.zip`;
@@ -139,14 +139,20 @@ export async function validateDocumentation(repositoryInput: string): Promise<vo
   ] as const) {
     requireText(document, '.github/workflows/ci.yml', `${name} pull request workflow`);
     requireText(document, '.github/workflows/update-latest.yml', `${name} MoonBit updater`);
-    requireText(document, '.github/workflows/update-tooling.yml', `${name} tooling updater`);
+    requireText(document, '.github/workflows/update-lua-rocks.yml', `${name} Lua updater`);
+    requireText(
+      document,
+      '.github/workflows/update-dependencies.yml',
+      `${name} dependency artifacts`,
+    );
+    requireText(document, 'Renovate', `${name} dependency automation`);
     requireText(document, '.github/workflows/release.yml', `${name} release workflow`);
     requireText(document, 'MOONBIT_UPDATER_CLIENT_ID', `${name} GitHub App client ID`);
     requireText(document, 'MOONBIT_UPDATER_PRIVATE_KEY', `${name} GitHub App private key`);
     requireText(document, commitSha, `${name} immutable Action references`);
     requireText(document, 'lua-rocks.lock', `${name} verified Lua dependencies`);
-    requireText(document, 'Workflows write', `${name} GitHub App workflow permission`);
-    requireText(document, 'engines.pnpm', `${name} mise-managed pnpm policy`);
+    requireText(document, 'Contents write', `${name} GitHub App contents permission`);
+    requireText(document, 'packageManager', `${name} mise-managed pnpm policy`);
     requireText(document, 'minimum_release_age: "0s"', `${name} latest-stable mise policy`);
     requireText(document, 'mise --version', `${name} actual mise version log`);
   }

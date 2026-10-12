@@ -43,7 +43,7 @@ Use these tasks for individual checks and maintenance:
 | `pnpm vp run docs:check` / `pnpm vp run update:check` | Documentation and release-manifest validation |
 | `pnpm vp run package` | Generate the deterministic plugin package |
 | `pnpm vp run update:discover` | Discover a complete upstream MoonBit release |
-| `mise run update:tooling` | Refresh compatible tool, npm, Lua rock, and GitHub Action locks |
+| `mise run update:lua` | Refresh compatible Lua rocks and their verified hashes |
 
 ## Pull request and main CI
 
@@ -52,7 +52,7 @@ Use these tasks for individual checks and maintenance:
 | Job | Environment | Responsibility |
 | --- | --- | --- |
 | `quality` | Ubuntu 24.04 x86_64 | Exact-manifest immutability, vulnerability review of dependency changes in the PR, all development-tool locks, and `pnpm vp run ci` |
-| `mise-lock` | Ubuntu 24.04 x86_64 | Confirms that the latest stable mise can resolve `mise.lock` |
+| `dependency_artifacts` | Shared workflow | Validates selected mise locks and the synchronized Vite+ dependency graph without secrets or writes |
 | `mise-e2e` | Ubuntu x86_64 / arm64, macOS arm64, Windows x86_64 | Downloads, installs, and activates official MoonBit through mise, then exercises a fixture project |
 | `vfox-e2e` | Ubuntu x86_64 / arm64, macOS arm64, Windows x86_64 | Performs the same real-download checks through standalone vfox |
 | `required` | Ubuntu 24.04 x86_64 | Reduces the results of the four groups above to one required result |
@@ -63,15 +63,15 @@ The repository ruleset treats `required` as the required check. This aggregation
 
 ## Version locks and latest-mise verification
 
-Versions resolved within compatibility ranges are recorded in locks and reused for ordinary installation.
+mise tools use exact declarations. Ordinary installations reuse the recorded dependency graph and checksums.
 
-- Node, pnpm, Lua, LuaRocks, and workflow inspection tools use compatibility ranges in `mise.toml` and pins in `mise.lock`.
+- Node, pnpm, Lua, LuaRocks, and workflow inspection tools use exact versions in `mise.toml` and pins in `mise.lock`.
 - Node dependencies use compatibility ranges in `package.json`; `pnpm-lock.yaml` pins them and their transitive dependencies.
 - Lua test dependencies use update series specified in `scripts/lua-rocks.sh`; `lua-rocks.lock` pins versions and source hashes.
 
-mise owns installation and updates of pnpm itself; `engines.pnpm` in `package.json` checks the supported series.
+mise installs Node and pnpm. `engines.node` and `packageManager` in `package.json` declare the same exact versions for Renovate, and CI checks declarations, locks, and executable versions. `pmOnFail: ignore` keeps pnpm from installing another package-manager version. Lua stays on 5.1; Node type definitions follow the runtime major.
 
-mise itself is deliberately unpinned to verify compatibility with its latest stable release. Every workflow explicitly sets mise-action's `minimum_release_age: "0s"` and `cache: false`, selecting the latest stable release without a publication-age delay. The Action code itself remains pinned to a commit SHA.
+mise itself is deliberately unpinned to verify compatibility with its latest stable release. Locally owned mise installation steps explicitly set mise-action's `minimum_release_age: "0s"` and `cache: false`, selecting the latest stable release without a publication-age delay. The Action code itself remains pinned to a commit SHA.
 
 Each job's `Record mise version` step runs `mise --version` to log the actual version used. A later rerun of the same commit may use a different mise version, so inspect this log when diagnosing failures. This exception prioritizes latest-mise compatibility while retaining development-tool and dependency locks.
 
@@ -102,23 +102,21 @@ A normal updater PR may change only `releases/*.json`. The workflow allowlist re
 
 ## Updating development tools and dependencies
 
-[`update-tooling.yml`](../.github/workflows/update-tooling.yml) runs every Monday at 03:30 JST (Sunday at 18:30 UTC) and on manual dispatch. `mise run update:tooling` updates mise tools, npm dependencies, the Vite+ package family, Lua test rocks, and GitHub Action locks together within their configured compatibility ranges.
+[Renovate configuration](../renovate.json) inherits the shared default and Vite+ presets from maya0513/renovate-config. Renovate proposes updates on Tuesdays in Asia/Tokyo after a seven-day release-age check. Non-major updates and lock maintenance may auto-merge after required CI and any required CODEOWNERS approval; major updates, runner changes, and shared-workflow revisions require manual review. This is an update window, not a guarantee of a single PR or a precise execution time.
 
-The updater installs Node and pnpm from the refreshed lock and switches to their executable paths before updating npm dependencies.
+Renovate selects npm, mise, and GitHub Action versions. Node and pnpm declarations in mise and package.json are grouped by tool. Actions remain pinned by full-length commit SHA, with a version comment; the approved shared workflow uses a SHA with a `# main` comment. The minimum supported mise and vfox runtime versions are reviewed separately.
 
-GitHub Actions are pinned in workflow files by full-length commit SHA, with a trailing `# vN` recording the allowed major. The updater finds the newest stable release tag in that major and updates only the commit SHA. Because runtime execution never follows the moving major tag, upstream tag changes cannot alter CI code without review.
+[`update-dependencies.yml`](../.github/workflows/update-dependencies.yml) calls the shared dependency-artifacts workflow on Renovate branch pushes. It generates mise locks, synchronizes coverage, Vitest overrides and the Vite core alias with the selected Vite+, and publishes at most one follow-up commit. It does not select a newer Vite+ or run the former broad tooling updater. Independent updates of those bundled packages are disabled; security fixes not yet available through Vite+ need manual handling.
 
-`scripts/lua-rocks.sh` hardcodes updates to the Busted 2, LuaCov 0.16, and Luacheck 1 series. The updater resolves the direct tools and their transitive dependencies, then records each version, upstream rockspec SHA-256, and extracted source-tree SHA-256 in `lua-rocks.lock`. If content changes for an already locked version, the run treats it as an upstream immutability violation and stops.
+CI calls the same workflow in verify-only mode without App secrets and includes its result in `required`. Both callers use identical groups: Conda GCC/Lua/LuaRocks on Linux x64/arm64, and other tools on Linux x64/arm64, macOS arm64 and Windows x64. Conda validation installs the recorded graph without re-solving it; other tools are regenerated from their selected exact versions. Configuration checks reject omitted or duplicate tools and incomplete platform coverage.
 
-The peer policy permits only the Vite+ 1 core alias that occupies the `vite` package name; CI rejects every other peer-dependency mismatch.
+Renovate also refreshes npm locks within declared ranges. pnpm has no additional cooldown configured here: Renovate's seven-day check does not guarantee the age of every transitive dependency or lock-maintenance update. Dependency review and frozen installation remain required. `renovate/artifacts` is diagnostic, not a required check for ordinary PRs.
 
-Only `.github/workflows/*.yml`, `lua-rocks.lock`, `mise.lock`, `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml` may change. When a diff exists, the workflow creates or updates the single `automation/maintenance-tooling` PR. This weekly PR is not auto-merged: a maintainer reviews the diff, the successful `required` check, and the dependency-review result before merging.
+## Updating Lua test dependencies
 
-Changes to major series, allowed Lua rock ranges, and tooling recipes remain outside automation because they require an explicit compatibility decision. They are handled by a separate manual pull request only when needed.
+[`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml) runs every Monday at 03:30 JST and on manual dispatch. `mise run update:lua` updates only Lua rocks within the Busted 2, LuaCov 0.16 and Luacheck 1 series, recording versions, rockspec SHA-256 values and extracted source-tree SHA-256 values. Changed content for an already locked version stops the update.
 
-CI failures, urgent vulnerabilities, and upstream specification changes need attention as they occur, so once a week describes normal maintenance. Dependency review covers dependencies recognized by GitHub and published advisories; the hashes in `lua-rocks.lock` verify Lua rock content.
-
-Dependency resolution runs without a write token. The workflow mints its short-lived GitHub App token only after dependency updates and repository-policy checks complete, then uses it to push allowlisted files to the automation branch.
+Only `lua-rocks.lock` may change. Updates use the single `automation/lua-rocks` branch and a weekly PR for manual review. npm, mise and workflow changes are rejected. The MoonBit daily updater remains independent of Renovate.
 
 ## Releasing the plugin
 
@@ -130,7 +128,7 @@ Before release, merge a pull request that updates the version in `metadata.lua` 
 
 ## Permissions and repository settings
 
-Workflows set their default permissions to read-only or empty and grant only the permissions required by each job. Checkout does not persist credentials. A short-lived token from the repository-specific GitHub App is used only when the MoonBit and development-tool updaters manipulate branches and pull requests.
+Workflows set their default permissions to read-only or empty and grant only the permissions required by each job. Checkout does not persist credentials. A short-lived token from the repository-specific GitHub App is used only when the MoonBit and Lua updaters manipulate branches and pull requests; dependency artifact publication uses a Contents-only token in a separate job.
 
 The repository requires the following Actions configuration:
 
@@ -139,12 +137,12 @@ The repository requires the following Actions configuration:
 | Variable | `MOONBIT_UPDATER_CLIENT_ID` | Client ID of the repository-specific GitHub App |
 | Secret | `MOONBIT_UPDATER_PRIVATE_KEY` | Private key used to mint an App token |
 | Repository setting | Dependency graph | Required for the pull-request dependency review; enable under Settings → Advanced Security |
-| Repository setting | Allow auto-merge | Squash-merges a MoonBit latest PR after required CI succeeds |
+| Repository setting | Allow auto-merge | Squash-merges eligible MoonBit and Renovate PRs after required checks and approvals |
 | Ruleset | Required check `required` | Prevents merging when any CI group fails |
 
-Install the GitHub App on this repository with Metadata read, Contents write, Pull requests write, and Workflows write. Workflows write is used only to update SHA-pinned Actions in the weekly pull request. Issue creation, workflow-history inspection, and release publication use the restricted `GITHUB_TOKEN` of the relevant workflow. Do not grant the App a ruleset bypass.
+Install the repository-specific GitHub App with Metadata read, Contents write and Pull requests write, without a ruleset bypass. Workflows write is no longer requested: Renovate's own App updates Action pins. The shared artifact publisher requests only Contents write; PR validation receives no App credentials. Issue creation, workflow-history inspection and releases use the relevant workflow's restricted GITHUB_TOKEN.
 
-To enable weekly updates, open the repository-specific App under [GitHub Apps settings](https://github.com/settings/apps), select Permissions & events, set Workflows under Repository permissions to Read and write, and save. Then approve the updated permissions under [Installed GitHub Apps](https://github.com/settings/installations). This is a one-time setup. After merging the workflow into `main`, manually run Update maintenance tools and confirm that it creates one PR and triggers its CI when updates exist.
+After deployment, manually run Update Lua test dependencies and inspect any resulting PR. On a real Renovate update, confirm that artifact synchronization produces no unrelated diff and that CI runs on the latest follow-up commit. Existing CODEOWNERS approval, required checks and up-to-date branch rules remain in force.
 
 ## Investigating failures
 
@@ -156,7 +154,8 @@ To enable weekly updates, open the repository-specific App under [GitHub Apps se
 | Only `required` appears to fail | One of its four dependency groups that failed or was cancelled |
 | Updater creates no change | Output of `Discover a complete upstream release`; an incomplete publication is deferred successfully |
 | Updater exits with code 2 | Manual-review PR and issue for installer, recipe, layout, schema, or major-version drift |
-| Tooling updater fails | Compatibility ranges, changed content at an existing Lua rock version, Action release tags, a change outside the allowlist, approval of the App's Workflows write permission, or a merge conflict on the automation branch |
+| Dependency artifacts fail | Node/pnpm declaration mismatch, missing platforms, stale locks, coverage/Vitest mismatch, or a bundled Vitest major change; regenerate from the selected versions |
+| Lua updater fails | Changed content at an existing rock version, incompatible Lua dependencies, a change outside lua-rocks.lock, or a branch conflict |
 | Release fails | Tag, `metadata.lua` version, origin URL, deterministic CI, and attestation permissions |
 
 Before rerunning a failure, run `pnpm vp run ci` locally at the same commit. Use a GitHub Actions rerun only for a credible transient external-service failure; address reproducible failures in a corrective pull request.

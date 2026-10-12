@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "local>maya0513/renovate-config",
+    "local>maya0513/renovate-config//presets/vite-plus"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
+      "matchManagers": ["npm", "mise"],
+      "matchDepNames": ["node"],
+      "groupName": "Node.js runtime"
+    },
+    {
+      "matchManagers": ["npm", "mise"],
+      "matchDepNames": ["pnpm"],
+      "groupName": "pnpm package manager"
+    },
+    {
+      "matchManagers": ["mise"],
+      "matchDatasources": ["conda"],
+      "registryUrls": ["https://api.anaconda.org/package/conda-forge/"]
+    },
+    {
+      "matchManagers": ["mise"],
+      "matchDepNames": ["conda:lua"],
+      "allowedVersions": ">=5.1.0 <5.2.0"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": ">=24.0.0 <25.0.0"
+    },
+    {
+      "matchDatasources": ["github-runners"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["maya0513/renovate-config"],
+      "automerge": false,
+      "minimumReleaseAge": null
+    }
+  ]
+}

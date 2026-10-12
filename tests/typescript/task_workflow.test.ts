@@ -47,6 +47,7 @@ describe('verification task graph', () => {
           'LICENSE',
           '.gitignore',
           '.gitattributes',
+          'renovate.json',
         ]),
       );
     }

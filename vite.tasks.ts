@@ -18,6 +18,7 @@ const typescriptSources = [
   'package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
+  'renovate.json',
   'tsconfig.json',
   'vite.config.ts',
   'vite.tasks.ts',
