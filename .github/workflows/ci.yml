@@ -99,7 +99,7 @@ jobs:
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   dependency_artifacts:
-    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@1070616046be77fce7b54ff3d1eb36d7f3f2732e # main
+    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@0bfed18e17cdcff074edec7eaf386f998747819a # main
     with:
       verify-only: true
       sync-vite-plus: true

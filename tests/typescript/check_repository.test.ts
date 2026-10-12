@@ -273,10 +273,6 @@ describe('Node maintenance tooling policy', () => {
       await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('mise-managed pnpm');
     }
     await writeFile(packagePath, original);
-    const lockPath = join(temporary, 'pnpm-lock.yaml');
-    const lock = await readFile(lockPath, 'utf8');
-    await writeFile(lockPath, `${lock}\npackageManagerDependencies: {}\n`);
-    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('locked only in mise.lock');
   });
 
   it('allows dependency updates within the selected major', async () => {

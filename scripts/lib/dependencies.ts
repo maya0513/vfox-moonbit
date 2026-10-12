@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { parse as parseToml } from 'smol-toml';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 import { isRecord } from './common.ts';
 
@@ -67,7 +67,19 @@ export async function checkDependencies(
   assert(typeof node === 'string' && typeof pnpm === 'string', 'Declare Node and pnpm');
   assert.equal(object(project.engines).node, node, 'Node declaration must match mise');
   assert.equal(project.packageManager, `pnpm@${pnpm}`, 'pnpm declaration must match mise');
-  assert.equal(workspace.pmOnFail, 'ignore', 'pnpm must remain mise-managed');
+  assert.equal(workspace.pmOnFail, 'error', 'Fail on a mismatch in mise-managed pnpm');
+  const documents = parseAllDocuments(await read('pnpm-lock.yaml'));
+  assert(
+    documents.every((document) => document.errors.length === 0),
+    'Invalid pnpm lockfile',
+  );
+  for (const field of ['specifier', 'version']) {
+    assert.equal(
+      documents[0]?.getIn(['importers', '.', 'packageManagerDependencies', 'pnpm', field]),
+      pnpm,
+      'Package-manager lock must follow the mise-managed pnpm declaration',
+    );
+  }
   const linux = ['linux-x64', 'linux-arm64'];
   assert.deepEqual(
     object(mise.settings).lockfile_platforms,
@@ -76,21 +88,16 @@ export async function checkDependencies(
   );
   assert.deepEqual(
     renovate.extends,
-    ['local>maya0513/renovate-config', 'local>maya0513/renovate-config//presets/vite-plus'],
-    'Use the shared default and Vite+ presets',
+    [
+      'local>maya0513/renovate-config',
+      'local>maya0513/renovate-config//presets/mise-pnpm',
+      'local>maya0513/renovate-config//presets/vite-plus',
+    ],
+    'Use the shared default, mise-pnpm and Vite+ presets',
   );
-  const miseManager = object(renovate.mise);
-  assert.equal(
-    miseManager.skipArtifactsUpdate,
-    true,
-    'Delegate mise artifacts to the shared workflow',
-  );
-  assert.equal(
-    object(miseManager.lockFileMaintenance).enabled,
-    false,
-    'Disable Renovate mise lock maintenance',
-  );
+  assert.equal(renovate.mise, undefined, 'Delegate mise policy to the shared preset');
   const rules = array(renovate.packageRules).map(object);
+  assert.equal(rules.length, 3, 'Keep only repository-specific Renovate rules');
   const rule = (field: string, value: unknown, label: string) => {
     const found = rules.find((entry) => JSON.stringify(entry[field]) === JSON.stringify(value));
     assert(found !== undefined, `Missing Renovate rule: ${label}`);
@@ -113,26 +120,6 @@ export async function checkDependencies(
     `>=${nodeMajor}.0.0 <${nodeMajor + 1}.0.0`,
     'Node types must follow the runtime major',
   );
-  assert.equal(rule('matchDepNames', ['node'], 'Node grouping').groupName, 'Node.js runtime');
-  assert.equal(rule('matchDepNames', ['pnpm'], 'pnpm grouping').groupName, 'pnpm package manager');
-  for (const name of ['node', 'pnpm']) {
-    assert.equal(
-      rule('matchDepNames', [name], name).skipArtifactsUpdate,
-      true,
-      'Delegate grouped runtime artifacts to the shared workflow',
-    );
-    assert.deepEqual(
-      rule('matchDepNames', [name], name).matchManagers,
-      ['npm', 'mise'],
-      'Group both declaration managers',
-    );
-  }
-  assert.equal(rule('matchManagers', ['npm'], 'npm lock updates').rangeStrategy, 'update-lockfile');
-  assert.equal(rule('matchDatasources', ['github-runners'], 'runners').automerge, false);
-  const shared = rule('matchPackageNames', ['maya0513/renovate-config'], 'shared workflow');
-  assert.equal(shared.automerge, false);
-  assert.equal(shared.minimumReleaseAge, null, 'Branch commits do not have release timestamps');
-
   const ci = object(parseYaml(await read('.github/workflows/ci.yml')));
   const update = object(parseYaml(await read('.github/workflows/update-dependencies.yml')));
   const ciJobs = object(ci.jobs);

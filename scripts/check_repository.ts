@@ -334,11 +334,6 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
       'package.json must declare exact Node.js and pnpm versions, use mise-managed pnpm, and remain private and unversioned',
     );
   }
-  if (
-    /\bpackageManagerDependencies:/.test(await readFile(join(repository, 'pnpm-lock.yaml'), 'utf8'))
-  ) {
-    throw new RepositoryError('pnpm itself must be locked only in mise.lock');
-  }
   const coverageVersion = devDependencies?.['@vitest/coverage-v8'];
   if (
     devDependencies === undefined ||

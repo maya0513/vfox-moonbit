@@ -69,7 +69,7 @@ miseのツールはexact版で宣言し、通常のインストールではロ�
 - Node依存は`package.json`で互換範囲を指定し、推移依存も含めて`pnpm-lock.yaml`で固定します。
 - Luaのテスト依存は`scripts/lua-rocks.sh`で更新対象の系列を指定し、バージョンとソースコードのハッシュを`lua-rocks.lock`で固定します。
 
-Nodeとpnpmの取得はmiseが担当します。Renovate向けに`package.json`の`engines.node`と`packageManager`にも同じexact版を宣言し、宣言・ロック・実行版の一致をCIで検証します。`pmOnFail: ignore`によりpnpm自身による別版の取得を避けます。Luaは5.1系を維持し、Nodeの型定義は実行版と同じメジャーに揃えます。
+Nodeとpnpmの取得はmiseが担当します。Renovate向けに`package.json`の`engines.node`と`packageManager`にも同じexact版を宣言し、宣言・ロック・実行版の一致をCIで検証します。`pmOnFail: error`により宣言と異なる実行版を拒否します。pnpmのlockfileにも選択済みpackage managerの依存を記録しますが、実行ファイルの取得はmiseが担当します。Luaは5.1系を維持し、Nodeの型定義は実行版と同じメジャーに揃えます。
 
 mise本体は最新安定版との互換性を確認するため、固定の対象外とします。このリポジトリで定義するmise導入ステップではmise-actionの`minimum_release_age: "0s"`と`cache: false`を明示し、公開からの待機時間を設けず最新安定版を取得します。アクション自体のコードはコミットSHAへ固定します。
 
@@ -104,7 +104,7 @@ E2E、配布元の最新版検出、リリースはネットワークや外部�
 
 [Renovate設定](../renovate.json)はmaya0513/renovate-configの共通defaultとVite+ presetを継承します。更新は日本時間の火曜日、公開後7日の待機を経て提案されます。non-majorとロック保守は必須CIと必要なCODEOWNERS承認を満たせば自動マージし、major、runner環境、共通ワークフロー参照の変更は手動で確認します。火曜日は更新を受け付ける期間であり、実行時刻やPRが一つになることを保証するものではありません。
 
-npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。Renovate自身のmise生成物更新とロック保守は無効にし、miseロックは共通ワークフローに集約します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通ワークフローはSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
+npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。共通mise-pnpmプリセットがRenovate自身のmise生成物更新とロック保守を無効にし、miseロックは共通ワークフローに集約します。独立したVite+プリセットも選択し、派生依存の宣言同期を同じワークフローへ任せます。pnpm更新のnpm生成処理は有効のままにし、package manager用のロック文書もRenovateが更新します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通ワークフローはSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
 
 [`update-dependencies.yml`](../.github/workflows/update-dependencies.yml)はRenovateブランチへのプッシュ時に共通dependency-artifactsワークフローを呼び出します。選択済みの版からmiseロックを生成し、coverage、Vitest override、Vite core aliasをVite+に同期して、必要な場合だけ追加の1コミットをプッシュします。Vite+の再選択や旧来の一括更新処理は行いません。同梱パッケージの独立更新は止めるため、Vite+経由で未提供の脆弱性修正は手動で対応します。
 
