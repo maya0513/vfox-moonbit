@@ -104,7 +104,7 @@ A normal updater PR may change only `releases/*.json`. The workflow allowlist re
 
 [Renovate configuration](../renovate.json) inherits the shared default and Vite+ presets from maya0513/renovate-config. Renovate proposes updates on Tuesdays in Asia/Tokyo after a seven-day release-age check. Non-major updates and lock maintenance may auto-merge after required CI and any required CODEOWNERS approval; major updates, runner changes, and shared-workflow revisions require manual review. This is an update window, not a guarantee of a single PR or a precise execution time.
 
-Renovate selects npm, mise, and GitHub Action versions. Node and pnpm declarations in mise and package.json are grouped by tool. Actions remain pinned by full-length commit SHA, with a version comment; the approved shared workflow uses a SHA with a `# main` comment. The minimum supported mise and vfox runtime versions are reviewed separately.
+Renovate selects npm, mise, and GitHub Action versions. Node and pnpm declarations in mise and package.json are grouped by tool. Renovate's own mise artifact generation and lock maintenance are disabled, leaving mise locks to the shared workflow. Actions remain pinned by full-length commit SHA, with a version comment; the approved shared workflow uses a SHA with a `# main` comment. The minimum supported mise and vfox runtime versions are reviewed separately.
 
 [`update-dependencies.yml`](../.github/workflows/update-dependencies.yml) calls the shared dependency-artifacts workflow on Renovate branch pushes. It generates mise locks, synchronizes coverage, Vitest overrides and the Vite core alias with the selected Vite+, and publishes at most one follow-up commit. It does not select a newer Vite+ or run the former broad tooling updater. Independent updates of those bundled packages are disabled; security fixes not yet available through Vite+ need manual handling.
 
@@ -157,5 +157,7 @@ After deployment, manually run Update Lua test dependencies and inspect any resu
 | Dependency artifacts fail | Node/pnpm declaration mismatch, missing platforms, stale locks, coverage/Vitest mismatch, or a bundled Vitest major change; regenerate from the selected versions |
 | Lua updater fails | Changed content at an existing rock version, incompatible Lua dependencies, a change outside lua-rocks.lock, or a branch conflict |
 | Release fails | Tag, `metadata.lua` version, origin URL, deterministic CI, and attestation permissions |
+
+For a transient Renovate artifact-generation failure, find the Update dependency artifacts run for the PR's latest commit and rerun it with `gh run rerun <run-id> --failed`. Fix declaration or main-branch conflicts first, then request a Renovate refresh using the PR body's rebase/retry checkbox. Wait for `required` to pass on the latest follow-up SHA before merging. A bundled Vitest major change or altered content at a published Lua rock version requires manual review, not repeated retries.
 
 Before rerunning a failure, run `pnpm vp run ci` locally at the same commit. Use a GitHub Actions rerun only for a credible transient external-service failure; address reproducible failures in a corrective pull request.

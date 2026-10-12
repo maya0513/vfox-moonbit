@@ -104,7 +104,7 @@ E2E、配布元の最新版検出、リリースはネットワークや外部�
 
 [Renovate設定](../renovate.json)はmaya0513/renovate-configの共通defaultとVite+ presetを継承します。更新は日本時間の火曜日、公開後7日の待機を経て提案されます。non-majorとロック保守は必須CIと必要なCODEOWNERS承認を満たせば自動マージし、major、runner環境、共通ワークフロー参照の変更は手動で確認します。火曜日は更新を受け付ける期間であり、実行時刻やPRが一つになることを保証するものではありません。
 
-npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通ワークフローはSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
+npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。Renovate自身のmise生成物更新とロック保守は無効にし、miseロックは共通ワークフローに集約します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通ワークフローはSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
 
 [`update-dependencies.yml`](../.github/workflows/update-dependencies.yml)はRenovateブランチへのプッシュ時に共通dependency-artifactsワークフローを呼び出します。選択済みの版からmiseロックを生成し、coverage、Vitest override、Vite core aliasをVite+に同期して、必要な場合だけ追加の1コミットをプッシュします。Vite+の再選択や旧来の一括更新処理は行いません。同梱パッケージの独立更新は止めるため、Vite+経由で未提供の脆弱性修正は手動で対応します。
 
@@ -157,5 +157,7 @@ npmのロック保守は宣言範囲内で行います。pnpm側に追加の待�
 | 依存生成物の検証が失敗 | Node／pnpmの宣言不一致、対象環境の不足、古いロック、coverage／Vitestの不一致、内蔵Vitestのメジャー変更。選択済みの版から再生成する |
 | Luaアップデーターが失敗 | 同じrock版の内容の変化、Lua依存の互換性、lua-rocks.lock以外の変更、ブランチの競合 |
 | リリースが失敗 | タグ、`metadata.lua`のバージョン、`origin`のURL、決定的CI、アテステーション権限 |
+
+Renovateの生成処理が一時的に失敗した場合は、対象PRの最新コミットに対応するUpdate dependency artifactsの実行を確認し、`gh run rerun <run-id> --failed`で再実行します。宣言やmainとの競合が原因なら先に修正し、PR本文のrebase/retryチェックボックスでRenovateに更新を依頼します。補助コミット後の最新SHAで`required`が成功するまでマージしません。Vitestのメジャー変更や公開済みLua rockのハッシュ変化は、再実行で回避せず手動レビューします。
 
 失敗を再実行する前に、同じコミットでローカルの`pnpm vp run ci`を実行します。外部サービスの一時障害と判断できる場合だけGitHub Actionsの再実行を使い、再現する失敗は修正PRで扱います。

@@ -79,6 +79,17 @@ export async function checkDependencies(
     ['local>maya0513/renovate-config', 'local>maya0513/renovate-config//presets/vite-plus'],
     'Use the shared default and Vite+ presets',
   );
+  const miseManager = object(renovate.mise);
+  assert.equal(
+    miseManager.skipArtifactsUpdate,
+    true,
+    'Delegate mise artifacts to the shared workflow',
+  );
+  assert.equal(
+    object(miseManager.lockFileMaintenance).enabled,
+    false,
+    'Disable Renovate mise lock maintenance',
+  );
   const rules = array(renovate.packageRules).map(object);
   const rule = (field: string, value: unknown, label: string) => {
     const found = rules.find((entry) => JSON.stringify(entry[field]) === JSON.stringify(value));

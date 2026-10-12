@@ -85,6 +85,13 @@ describe('dependency automation contract', () => {
     ['renovate.json', '>=5.1.0 <5.2.0', '>=5.0.0 <6.0.0', 'Lua 5.1'],
     ['renovate.json', '>=24.0.0 <25.0.0', '>=25.0.0 <26.0.0', 'Node types'],
     [
+      'renovate.json',
+      '"skipArtifactsUpdate": true',
+      '"skipArtifactsUpdate": false',
+      'mise artifacts',
+    ],
+    ['renovate.json', '"enabled": false', '"enabled": true', 'mise lock maintenance'],
+    [
       '.github/workflows/update-dependencies.yml',
       'sync-vite-plus: true',
       'sync-vite-plus: false',

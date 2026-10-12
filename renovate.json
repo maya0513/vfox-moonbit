@@ -4,6 +4,12 @@
     "local>maya0513/renovate-config",
     "local>maya0513/renovate-config//presets/vite-plus"
   ],
+  "mise": {
+    "skipArtifactsUpdate": true,
+    "lockFileMaintenance": {
+      "enabled": false
+    }
+  },
   "packageRules": [
     {
       "matchManagers": ["npm"],
