@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,12 +6,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 
 import { checkDependencies, checkInstalledVersions } from '../../scripts/lib/dependencies.ts';
+import { isRecord } from '../../scripts/lib/common.ts';
 import { REPOSITORY } from './fixtures.ts';
 
-const project = JSON.parse(await readFile(join(REPOSITORY, 'package.json'), 'utf8')) as {
-  engines: { node: string };
-  packageManager: string;
-};
+const project: unknown = JSON.parse(await readFile(join(REPOSITORY, 'package.json'), 'utf8'));
+assert(
+  isRecord(project) &&
+    isRecord(project.engines) &&
+    typeof project.engines.node === 'string' &&
+    typeof project.packageManager === 'string',
+);
 const NODE = project.engines.node;
 const PNPM = project.packageManager.slice('pnpm@'.length);
 
