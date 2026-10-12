@@ -92,6 +92,18 @@ describe('dependency automation contract', () => {
     ],
     ['renovate.json', '"enabled": false', '"enabled": true', 'mise lock maintenance'],
     [
+      'renovate.json',
+      '"groupName": "Node.js runtime",\n      "skipArtifactsUpdate": true',
+      '"groupName": "Node.js runtime",\n      "skipArtifactsUpdate": false',
+      'grouped runtime artifacts',
+    ],
+    [
+      'renovate.json',
+      '"groupName": "pnpm package manager",\n      "skipArtifactsUpdate": true',
+      '"groupName": "pnpm package manager",\n      "skipArtifactsUpdate": false',
+      'grouped runtime artifacts',
+    ],
+    [
       '.github/workflows/update-dependencies.yml',
       'sync-vite-plus: true',
       'sync-vite-plus: false',

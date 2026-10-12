@@ -18,12 +18,14 @@
     {
       "matchManagers": ["npm", "mise"],
       "matchDepNames": ["node"],
-      "groupName": "Node.js runtime"
+      "groupName": "Node.js runtime",
+      "skipArtifactsUpdate": true
     },
     {
       "matchManagers": ["npm", "mise"],
       "matchDepNames": ["pnpm"],
-      "groupName": "pnpm package manager"
+      "groupName": "pnpm package manager",
+      "skipArtifactsUpdate": true
     },
     {
       "matchManagers": ["mise"],

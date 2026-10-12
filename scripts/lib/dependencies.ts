@@ -116,6 +116,11 @@ export async function checkDependencies(
   assert.equal(rule('matchDepNames', ['node'], 'Node grouping').groupName, 'Node.js runtime');
   assert.equal(rule('matchDepNames', ['pnpm'], 'pnpm grouping').groupName, 'pnpm package manager');
   for (const name of ['node', 'pnpm']) {
+    assert.equal(
+      rule('matchDepNames', [name], name).skipArtifactsUpdate,
+      true,
+      'Delegate grouped runtime artifacts to the shared workflow',
+    );
     assert.deepEqual(
       rule('matchDepNames', [name], name).matchManagers,
       ['npm', 'mise'],
