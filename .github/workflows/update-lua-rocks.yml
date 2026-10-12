@@ -1,4 +1,4 @@
-name: Update maintenance tools
+name: Update Lua test dependencies
 
 on:
   schedule:
@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: maintenance-tooling-updater
+  group: lua-rocks-updater
   cancel-in-progress: false
 
 jobs:
   update:
-    name: Refresh maintenance locks and propose update
+    name: Refresh verified Lua rocks and propose update
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -39,7 +39,7 @@ jobs:
       - name: Prepare the single automation branch
         shell: bash
         run: |
-          branch="automation/maintenance-tooling"
+          branch="automation/lua-rocks"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
             git fetch origin "$branch"
             git switch -c "$branch" FETCH_HEAD
@@ -50,8 +50,13 @@ jobs:
             git switch -c "$branch"
           fi
 
-      - name: Refresh compatible versions and locks
-        run: mise run update:tooling
+      - name: Install locked Lua lock-generation tools
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mise install --locked node conda:gcc conda:lua conda:luarocks
+
+      - name: Refresh compatible Lua rocks
+        run: mise run update:lua
 
       - name: Create repository-scoped GitHub App token
         id: app-token
@@ -63,7 +68,6 @@ jobs:
           repositories: vfox-moonbit
           permission-contents: write
           permission-pull-requests: write
-          permission-workflows: write
 
       - name: Resolve updater identity
         shell: bash
@@ -90,15 +94,15 @@ jobs:
         run: |
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/*.yml|lua-rocks.lock|mise.lock|package.json|pnpm-lock.yaml|pnpm-workspace.yaml) ;;
-              *) echo "Tooling updater changed forbidden path: $path" >&2; exit 1 ;;
+              lua-rocks.lock) ;;
+              *) echo "Lua updater changed forbidden path: $path" >&2; exit 1 ;;
             esac
           done < <({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)
-          git add .github/workflows lua-rocks.lock mise.lock package.json pnpm-lock.yaml pnpm-workspace.yaml
+          git add -- lua-rocks.lock
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update maintenance tools within compatible ranges"
+            git commit -m "chore: update verified Lua test dependencies"
           fi
-          branch="automation/maintenance-tooling"
+          branch="automation/lua-rocks"
           if git diff --quiet origin/main HEAD; then
             exit 0
           fi
@@ -107,10 +111,10 @@ jobs:
           if [[ -z "$number" ]]; then
             body="$RUNNER_TEMP/tooling-pr-body.md"
             cat > "$body" <<'BODY'
-          Updates mise tools, npm dependencies, Lua test rocks, and full-length GitHub Action commit pins together. Configured compatibility ranges are preserved; Vite/Vitest/coverage versions stay synchronized; Lua rock recipes and source trees retain SHA-256 verification.
+          Updates compatible Lua test rocks. Versions, upstream rockspec SHA-256 values, and extracted source-tree SHA-256 values remain locked and verified.
 
           CI and dependency review validate this update before merge. This PR is never auto-merged, so the normal maintenance workload is one review of this weekly PR.
           BODY
             gh pr create --head "$branch" --base main \
-              --title "chore: update maintenance tools" --body-file "$body"
+              --title "chore: update Lua test dependencies" --body-file "$body"
           fi

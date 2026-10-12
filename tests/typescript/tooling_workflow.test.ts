@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -56,84 +56,47 @@ async function commit(cwd: string, message: string): Promise<void> {
 }
 
 describe('weekly maintenance workflow', () => {
-  it('uses only the mise-locked pnpm after refreshing tools, without self-updating it', async () => {
+  it('rejects every change outside the Lua lock before staging or pushing', async () => {
+    const workflow = await readFile(
+      join(REPOSITORY, '.github/workflows/update-lua-rocks.yml'),
+      'utf8',
+    );
+    expect(workflow).not.toContain('permission-workflows:');
+    expect(workflow).not.toContain('pnpm update');
+    const block =
+      /          while IFS= read -r path; do[\s\S]*?\n          git add -- lua-rocks.lock/.exec(
+        workflow,
+      )?.[0];
+    expect(block).toBeDefined();
     const repository = join(temporary, 'repository');
-    const oldBin = join(temporary, 'old bin');
-    const freshBin = join(temporary, 'fresh bin');
-    const log = join(temporary, 'commands');
-    await mkdir(join(repository, 'scripts'), { recursive: true });
-    await mkdir(join(repository, 'node_modules/vite-plus'), { recursive: true });
-    await mkdir(oldBin);
-    await mkdir(freshBin);
-    for (const name of ['package.json', 'pnpm-workspace.yaml', 'scripts/update-tooling.sh']) {
-      await copyFile(join(REPOSITORY, name), join(repository, name));
-    }
-    await writeFile(
-      join(repository, 'node_modules/vite-plus/package.json'),
-      JSON.stringify({
-        dependencies: { vitest: '5.0.1', vite: 'npm:@voidzero-dev/vite-plus-core@1.0.0' },
-      }),
-    );
-    for (const name of ['update_actions.ts', 'check_repository.ts']) {
-      await writeFile(join(repository, 'scripts', name), 'export {};\n');
-    }
-    await writeFile(join(repository, 'scripts/lua-rocks.sh'), 'exit 0\n');
-    await writeFile(
-      join(oldBin, 'mise'),
-      `#!/usr/bin/env bash
-printf 'mise %s\\n' "$*" >> "$FIXTURE_LOG"
-case "$*" in
-  'which node') printf '%s/node\\n' "$FIXTURE_FRESH_BIN" ;;
-  'which pnpm') printf '%s/pnpm\\n' "$FIXTURE_FRESH_BIN" ;;
-  'lock --bump '*|'install --locked '*) ;;
-  *) exit 99 ;;
-esac
-`,
-      { mode: 0o755 },
-    );
-    for (const name of ['pnpm', 'node']) {
-      await writeFile(join(oldBin, name), '#!/usr/bin/env bash\nexit 98\n', { mode: 0o755 });
-    }
-    await symlink(process.execPath, join(freshBin, 'node'));
-    await writeFile(
-      join(freshBin, 'pnpm'),
-      `#!/usr/bin/env bash
-printf 'pnpm %s\\n' "$*" >> "$FIXTURE_LOG"
-case "$*" in
-  'update --no-save'|'install --no-frozen-lockfile'|'vp fmt package.json pnpm-workspace.yaml') ;;
-  *) exit 99 ;;
-esac
-`,
-      { mode: 0o755 },
-    );
+    await mkdir(repository);
     await git(repository, ['init']);
-    await execute('bash', ['scripts/update-tooling.sh'], {
+    await writeFile(join(repository, 'lua-rocks.lock'), 'initial');
+    await writeFile(join(repository, 'package.json'), '{}');
+    await commit(repository, 'initial');
+    const script = String(block).replace(/^          /gm, '');
+    await writeFile(join(repository, 'lua-rocks.lock'), 'updated');
+    await execute('bash', ['-euo', 'pipefail', '-c', script], {
       cwd: repository,
-      env: {
-        ...process.env,
-        PATH: `${oldBin}:${process.env.PATH}`,
-        FIXTURE_FRESH_BIN: freshBin,
-        FIXTURE_LOG: log,
-      },
+      env: environment(),
     });
-    const commands = (await readFile(log, 'utf8')).trim().split('\n');
-    expect(commands).toContain(
-      'mise install --locked node pnpm conda:gcc conda:lua conda:luarocks',
-    );
-    expect(commands.filter((command) => command.startsWith('pnpm '))).toEqual([
-      'pnpm update --no-save',
-      'pnpm install --no-frozen-lockfile',
-      'pnpm vp fmt package.json pnpm-workspace.yaml',
-    ]);
-    const document = JSON.parse(await readFile(join(repository, 'package.json'), 'utf8'));
-    expect(document.engines.pnpm).toBe('12.x');
-    expect(document).not.toHaveProperty('devEngines');
-    expect(document).not.toHaveProperty('packageManager');
+    expect(await git(repository, ['diff', '--cached', '--name-only'])).toBe('lua-rocks.lock');
+    await git(repository, ['reset', '--quiet']);
+    await writeFile(join(repository, 'package.json'), '{"changed":true}');
+    await expect(
+      execute('bash', ['-euo', 'pipefail', '-c', script], { cwd: repository, env: environment() }),
+    ).rejects.toMatchObject({ code: 1 });
+    expect(await git(repository, ['diff', '--cached', '--name-only'])).toBe('');
+    await writeFile(join(repository, 'package.json'), '{}');
+    await writeFile(join(repository, 'unexpected'), 'new');
+    await expect(
+      execute('bash', ['-euo', 'pipefail', '-c', script], { cwd: repository, env: environment() }),
+    ).rejects.toMatchObject({ code: 1 });
   });
 
   it('creates and reuses the automation branch on a runner without a Git identity', async () => {
     const workflow = await readFile(
-      join(REPOSITORY, '.github/workflows/update-tooling.yml'),
+      join(REPOSITORY, '.github/workflows/update-lua-rocks.yml'),
       'utf8',
     );
     const block =
@@ -152,7 +115,7 @@ esac
     await git(main, ['push', 'origin', 'main']);
     await git(temporary, ['clone', remote, worker]);
     await execute('bash', ['-euo', 'pipefail', '-c', script], { cwd: worker, env: environment() });
-    expect(await git(worker, ['branch', '--show-current'])).toBe('automation/maintenance-tooling');
+    expect(await git(worker, ['branch', '--show-current'])).toBe('automation/lua-rocks');
     await writeFile(join(worker, 'lock.txt'), 'weekly update');
     await commit(worker, 'automation update');
     await git(worker, ['push', 'origin', 'HEAD']);

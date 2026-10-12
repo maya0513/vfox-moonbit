@@ -1,0 +1,22 @@
+name: Update dependency artifacts
+
+on:
+  push:
+    branches: ["renovate/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency_artifacts:
+    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@1070616046be77fce7b54ff3d1eb36d7f3f2732e # main
+    with:
+      verify-only: false
+      sync-vite-plus: true
+      sync-declarations: true
+      lock-groups: >-
+        [{"lockfile":"mise.lock","tools":["conda:gcc","conda:lua","conda:luarocks"],"platforms":["linux-x64","linux-arm64"],"verify":"locked"},
+         {"lockfile":"mise.lock","tools":["actionlint","node","pnpm","shellcheck","stylua","vfox","zizmor"],"platforms":["linux-x64","linux-arm64","macos-arm64","windows-x64"],"verify":"regenerate"}]
+      app-client-id: ${{ vars.MOONBIT_UPDATER_CLIENT_ID }}
+    secrets:
+      app-private-key: ${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}

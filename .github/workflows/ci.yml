@@ -98,29 +98,15 @@ jobs:
           path: node_modules/.vite/task-cache
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
-  mise_lock:
-    name: mise-lock (mise latest)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Install mise under test
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
-        with:
-          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
-          install: false
-          cache: false
-          experimental: true
-
-      - name: Record mise version
-        run: mise --version
-
-      - name: Validate the compatibility lockfile
-        run: mise install --locked --dry-run
+  dependency_artifacts:
+    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@1070616046be77fce7b54ff3d1eb36d7f3f2732e # main
+    with:
+      verify-only: true
+      sync-vite-plus: true
+      sync-declarations: true
+      lock-groups: >-
+        [{"lockfile":"mise.lock","tools":["conda:gcc","conda:lua","conda:luarocks"],"platforms":["linux-x64","linux-arm64"],"verify":"locked"},
+         {"lockfile":"mise.lock","tools":["actionlint","node","pnpm","shellcheck","stylua","vfox","zizmor"],"platforms":["linux-x64","linux-arm64","macos-arm64","windows-x64"],"verify":"regenerate"}]
 
   mise_e2e:
     name: mise-e2e (${{ matrix.os }}, mise latest)
@@ -227,7 +213,7 @@ jobs:
   required:
     name: required
     if: ${{ always() }}
-    needs: [quality, mise_lock, mise_e2e, vfox_e2e]
+    needs: [quality, dependency_artifacts, mise_e2e, vfox_e2e]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -236,7 +222,7 @@ jobs:
         shell: bash
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
-          LOCK_RESULT: ${{ needs.mise_lock.result }}
+          LOCK_RESULT: ${{ needs.dependency_artifacts.result }}
           MISE_RESULT: ${{ needs.mise_e2e.result }}
           VFOX_RESULT: ${{ needs.vfox_e2e.result }}
         run: |

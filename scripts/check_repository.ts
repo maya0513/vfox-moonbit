@@ -6,6 +6,8 @@ import { lstat, readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { checkDependencies, checkInstalledVersions } from './lib/dependencies.ts';
+
 import { parseMetadata } from './package_plugin.ts';
 import { miseTasks, viteTasks as taskNames } from './check_documentation.ts';
 import { validateLocal } from './update_latest.ts';
@@ -16,7 +18,7 @@ export { EXPECTED_REPOSITORY, OWNER, REPOSITORY };
 const ACTION_RE = /^\s*(?:-\s+)?uses:\s*([^\s#]+)/gm;
 const APPROVED_ACTION_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}$/;
 const PINNED_ACTION_LINE_RE =
-  /^\s*(?:-\s+)?uses:\s*[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}\s+#\s+v[1-9][0-9]*\s*$/gm;
+  /^\s*(?:-\s+)?uses:\s*[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}\s+#\s+(?:v[1-9][0-9]*(?:\.\d+\.\d+)?|main)\s*$/gm;
 const REMOTE_RE = /^(?:https:\/\/github\.com\/|git@github\.com:)([^/]+\/[^/]+?)(?:\.git)?$/;
 const FORBIDDEN_WORKFLOW_TOOL_RE =
   /\b(?:actions\/setup-python|python(?:3(?:\.\d+)?)?|uv|pytest|ruff)\b/i;
@@ -25,6 +27,8 @@ const APPROVED_DEV_DEPENDENCIES = {
   '@types/yauzl': 3,
   '@types/yazl': 3,
   '@vitest/coverage-v8': 5,
+  'smol-toml': 1,
+  yaml: 2,
   tar: 7,
   'vite-plus': 1,
   yauzl: 3,
@@ -217,6 +221,16 @@ export async function checkActions(repository: string): Promise<void> {
         `GitHub Action pins need trailing major tag comments in ${path.split('/').at(-1)}`,
       );
     }
+    for (const line of text.split('\n')) {
+      if (
+        /uses:.*#\s+main\s*$/.test(line) &&
+        !/uses:\s+maya0513\/renovate-config\/\.github\/workflows\/dependency-artifacts\.yml@/.test(
+          line,
+        )
+      ) {
+        throw new RepositoryError('Only the approved shared workflow may follow main');
+      }
+    }
     let miseCount = 0;
     for (const step of text.split(/(?=^ {6}- )/m)) {
       if (!/^ {8}uses:\s*jdx\/mise-action@/m.test(step)) continue;
@@ -311,13 +325,13 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     packageDocument.private !== true ||
     packageDocument.version !== undefined ||
     packageDocument.type !== 'module' ||
-    engines?.node !== '24.x' ||
-    engines.pnpm !== '12.x' ||
-    packageDocument.packageManager !== undefined ||
+    typeof engines?.node !== 'string' ||
+    engines.pnpm !== undefined ||
+    typeof packageDocument.packageManager !== 'string' ||
     packageDocument.devEngines !== undefined
   ) {
     throw new RepositoryError(
-      'package.json must declare the approved Node.js and pnpm engine ranges, use mise-managed pnpm, and remain private and unversioned',
+      'package.json must declare exact Node.js and pnpm versions, use mise-managed pnpm, and remain private and unversioned',
     );
   }
   if (
@@ -404,18 +418,15 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
   }
 
   const mise = await readFile(join(repository, 'mise.toml'), 'utf8');
-  if (!/^node\s*=\s*"24"$/m.test(mise) || !/^pnpm\s*=\s*"12"$/m.test(mise)) {
-    throw new RepositoryError('mise.toml must select the approved Node.js and pnpm major versions');
-  }
   const selectedMiseTasks = miseTasks(mise);
   if (
     selectedMiseTasks.size !== 2 ||
     !selectedMiseTasks.has('bootstrap') ||
-    !selectedMiseTasks.has('update:tooling') ||
+    !selectedMiseTasks.has('update:lua') ||
     !mise.includes('run = "bash scripts/bootstrap.sh"') ||
-    !mise.includes('run = "bash scripts/update-tooling.sh"')
+    !mise.includes('run = "bash scripts/lua-rocks.sh update"')
   ) {
-    throw new RepositoryError('mise must define only bootstrap and update:tooling shell tasks');
+    throw new RepositoryError('mise must define only bootstrap and update:lua shell tasks');
   }
 
   const viteConfig = await readFile(join(repository, 'vite.config.ts'), 'utf8');
@@ -446,8 +457,8 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
       throw new RepositoryError(`Vite Task must define maintenance task: ${task}`);
     }
   }
-  if (selectedViteTasks.has('bootstrap') || selectedViteTasks.has('update:tooling')) {
-    throw new RepositoryError('bootstrap and update:tooling belong only in mise');
+  if (selectedViteTasks.has('bootstrap') || selectedViteTasks.has('update:lua')) {
+    throw new RepositoryError('bootstrap and update:lua belong only in mise');
   }
   if ((viteTasks.match(/cache: false/g) ?? []).length !== 4) {
     throw new RepositoryError(
@@ -466,28 +477,23 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     throw new RepositoryError('CI must enforce dependency review and the isolated Vite Task cache');
   }
   const toolingWorkflow = await readFile(
-    join(repository, '.github', 'workflows', 'update-tooling.yml'),
+    join(repository, '.github', 'workflows', 'update-lua-rocks.yml'),
     'utf8',
   );
   for (const contract of [
-    'permission-workflows: write',
-    'mise run update:tooling',
-    '.github/workflows/*.yml|lua-rocks.lock|mise.lock',
+    'mise run update:lua',
+    'mise install --locked node conda:gcc conda:lua conda:luarocks',
+    'lua-rocks.lock) ;;',
+    'git add -- lua-rocks.lock',
   ]) {
     if (!toolingWorkflow.includes(contract)) {
-      throw new RepositoryError(`tooling updater is missing contract: ${contract}`);
+      throw new RepositoryError(`Lua updater is missing contract: ${contract}`);
     }
   }
-
-  const toolingUpdater = await readFile(join(repository, 'scripts', 'update-tooling.sh'), 'utf8');
-  if (
-    !toolingUpdater.includes('mise install --locked node pnpm conda:gcc conda:lua conda:luarocks')
-  ) {
-    throw new RepositoryError('tooling updater must install every Lua lock-generation tool');
+  if (toolingWorkflow.includes('permission-workflows:')) {
+    throw new RepositoryError('Lua updater must not request workflow write permission');
   }
-  if (/\bpnpm\s+(?:self-update|env)\b/.test(toolingUpdater)) {
-    throw new RepositoryError('tooling updater must update pnpm only through mise');
-  }
+  await checkDependencies(repository);
   const files = await repositoryFiles(repository);
   const forbidden = files.filter(
     (name) => name.endsWith('.py') || name === 'pyproject.toml' || name === 'uv.lock',
@@ -571,6 +577,9 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
   try {
     const argumentsValue = parseArguments(argv);
     await validate(argumentsValue.repository, { requireOrigin: argumentsValue.requireOrigin });
+    const versions = await checkDependencies(argumentsValue.repository);
+    const pnpm = spawnSync('pnpm', ['--version'], { encoding: 'utf8', shell: false });
+    checkInstalledVersions(versions.node, versions.pnpm, process.version, pnpm.stdout);
     console.log(`repository policy is valid for ${EXPECTED_REPOSITORY}`);
     return 0;
   } catch (error) {

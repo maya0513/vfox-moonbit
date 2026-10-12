@@ -28,21 +28,23 @@ async function write(path: string, content: string): Promise<void> {
 }
 
 function readme(extra = ''): string {
-  return `${PROJECT_TOOL_SPEC}\nmoon version\n${PROJECT_CONFIG_SPEC}\nmise install\nmoon version\n${RELEASE_URL}\nmise 2026.10.3\nvfox 1.0.12\nMOON_TOOLCHAIN_ROOT\nMOON_HOME\n${extra}`;
+  return `${PROJECT_TOOL_SPEC}\nmoon version\n${PROJECT_CONFIG_SPEC}\nmise install\nmoon version\n${RELEASE_URL}\nmise 2026.10.3\nvfox 1.x\nMOON_TOOLCHAIN_ROOT\nMOON_HOME\n${extra}`;
 }
 
 function ciDocument(language: 'en' | 'ja' = 'en'): string {
   return [
     '.github/workflows/ci.yml',
     '.github/workflows/update-latest.yml',
-    '.github/workflows/update-tooling.yml',
+    '.github/workflows/update-lua-rocks.yml',
+    '.github/workflows/update-dependencies.yml',
+    'Renovate',
     '.github/workflows/release.yml',
     'MOONBIT_UPDATER_CLIENT_ID',
     'MOONBIT_UPDATER_PRIVATE_KEY',
     language === 'ja' ? '省略しないコミットSHA' : 'full-length commit SHA',
     'lua-rocks.lock',
-    'Workflows write',
-    'engines.pnpm',
+    'Contents write',
+    'packageManager',
     'minimum_release_age: "0s"',
     'mise --version',
     'weekly PR',
@@ -196,7 +198,7 @@ describe('documentation checker', () => {
       ciDocument().replace('.github/workflows/release.yml', '.github/workflows/publish.yml'),
       'release workflow',
     ],
-    ['docs/CI.ja.md', ciDocument('ja').replace('engines.pnpm', ''), 'mise-managed pnpm policy'],
+    ['docs/CI.ja.md', ciDocument('ja').replace('packageManager', ''), 'mise-managed pnpm policy'],
     [
       'docs/CI.md',
       ciDocument().replace('minimum_release_age: "0s"', ''),

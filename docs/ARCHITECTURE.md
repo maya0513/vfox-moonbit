@@ -88,9 +88,9 @@ mise installs development tools and prepares the environment. Bootstrapping the 
 
 ### Dependency version management
 
-Compatibility ranges determine the choices available during updates; locks specify the concrete versions used for ordinary installation. Tools and dependencies use locks appropriate to their ecosystems, with mise itself as the sole exception to prioritize latest-stable compatibility checks.
+mise tools use exact declarations, while npm dependencies use compatibility ranges. Locks record the dependency graphs used for ordinary installation. mise itself remains unpinned to prioritize latest-stable compatibility checks.
 
-The Vite core, Vitest runner, and coverage provider must stay aligned with Vite+ and are updated together.
+Renovate selects development dependency versions. The shared workflow generates mise locks and aligns Vite core, Vitest, and coverage with the selected Vite+. Repository-owned updaters retain MoonBit distribution validation and hashed LuaRocks updates.
 
 ### Configuration and documentation checks
 

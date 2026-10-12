@@ -1,6 +1,8 @@
 packages:
   - '.'
 
+pmOnFail: ignore
+
 storeDir: .pnpm-store
 
 overrides:
