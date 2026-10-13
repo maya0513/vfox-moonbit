@@ -1200,6 +1200,18 @@ url = "https://github.com/pnpm/pnpm/releases/download/v12.10.0/pnpm-linux-x64.ta
 url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/613996931"
 provenance = "github-attestations"
 
+[tools.pnpm."platforms.macos-arm64"]
+checksum = "sha256:b36d2af27242e190b30c9bf621fba78e48f10cc830e2003ed5dc3ec6e0100af0"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.10.0/pnpm-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/613996920"
+provenance = "github-attestations"
+
+[tools.pnpm."platforms.windows-x64"]
+checksum = "sha256:a7b9893f780b95e6edd2a4cd03f8757a90d8f2d7747a85f9c036da7499fb06d8"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.10.0/pnpm-win32-x64.zip"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/613996926"
+provenance = "github-attestations"
+
 [[tools.shellcheck]]
 version = "0.11.0"
 backend = "aqua:koalaman/shellcheck"
