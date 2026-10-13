@@ -89,9 +89,9 @@ export async function checkDependencies(
   assert.deepEqual(
     renovate.extends,
     [
-      'local>maya0513/renovate-config#0bfed18e17cdcff074edec7eaf386f998747819a',
-      'local>maya0513/renovate-config//presets/mise-pnpm#0bfed18e17cdcff074edec7eaf386f998747819a',
-      'local>maya0513/renovate-config//presets/vite-plus#0bfed18e17cdcff074edec7eaf386f998747819a',
+      'local>maya0513/renovate-config',
+      'local>maya0513/renovate-config//presets/mise-pnpm',
+      'local>maya0513/renovate-config//presets/viteplus',
     ],
     'Use the shared default, mise-pnpm and Vite+ presets',
   );
@@ -124,22 +124,104 @@ export async function checkDependencies(
   const update = object(parseYaml(await read('.github/workflows/update-dependencies.yml')));
   const ciJobs = object(ci.jobs);
   const checkJob = object(ciJobs.dependency_artifacts);
-  const updateJob = object(object(update.jobs).dependency_artifacts);
-  assert.match(
-    String(checkJob.uses),
-    /^maya0513\/renovate-config\/\.github\/workflows\/dependency-artifacts\.yml@[a-f0-9]{40}$/,
-    'Pin the shared workflow',
-  );
-  assert.equal(updateJob.uses, checkJob.uses, 'Use the same shared workflow revision');
-  const checkInputs = object(checkJob.with);
-  const updateInputs = object(updateJob.with);
-  assert.equal(checkInputs['verify-only'], true, 'CI must be read-only');
-  assert.equal(checkJob.secrets, undefined, 'Read-only validation must not receive secrets');
-  assert.equal(updateInputs['verify-only'], false, 'Updates must generate artifacts');
-  for (const inputs of [checkInputs, updateInputs]) {
-    assert.equal(inputs['sync-vite-plus'], true, 'Enable Vite+ synchronization');
-    assert.equal(inputs['sync-declarations'], true, 'Enable declaration synchronization');
+  const updateJobs = object(update.jobs);
+  const updateJob = object(updateJobs.prepare);
+  const publishJob = object(updateJobs.publish);
+  const prefix = 'maya0513/renovate-config/.github/';
+  const names = ['mise-pnpm', 'pnpm-viteplus', 'pnpm-outputs'];
+  const ids = ['mise', 'viteplus', 'outputs'];
+  const components = (job: Record<string, unknown>) =>
+    array(job.steps)
+      .map(object)
+      .filter((step) => String(step.uses).startsWith(prefix));
+  const checkSteps = components(checkJob);
+  const updateSteps = components(updateJob);
+  const revision = String(object(checkSteps[0]).uses).split('@')[1];
+  assert.match(String(revision), /^[a-f0-9]{40}$/, 'Pin shared components to a full SHA');
+  for (const [job, steps, mode] of [
+    [checkJob, checkSteps, 'true'],
+    [updateJob, updateSteps, 'false'],
+  ] as const) {
+    assert.deepEqual(
+      steps.map((step) => step.id),
+      ids,
+      'Connect shared components in order',
+    );
+    steps.forEach((step, index) => {
+      assert.equal(
+        step.uses,
+        `${prefix}actions/${names[index]}@${revision}`,
+        'Use the same shared component revision',
+      );
+    });
+    assert.equal(job.secrets, undefined, 'Preparation must not receive secrets');
+    assert.doesNotMatch(JSON.stringify(job), /secrets\./, 'Preparation must not reference secrets');
+    assert.equal(
+      object(steps[0]!.with)['verify-only'],
+      mode,
+      'CI must be read-only and updates must generate artifacts',
+    );
+    assert.deepEqual(
+      steps[1]!.with,
+      {
+        'preparation-state': '${{ steps.mise.outputs.state }}',
+      },
+      'Connect Vite+ preparation state and inherit verification mode',
+    );
+    assert.deepEqual(
+      steps[2]!.with,
+      {
+        'mise-state': '${{ steps.mise.outputs.state }}',
+        'viteplus-state': '${{ steps.viteplus.outputs.state }}',
+      },
+      'Connect final validation states',
+    );
   }
+  assert.deepEqual(ci.permissions, { contents: 'read' }, 'CI permissions must be read-only');
+  assert.deepEqual(
+    update.permissions,
+    { contents: 'read' },
+    'Update permissions must be read-only',
+  );
+  assert.equal(
+    updateJob.if,
+    "github.event_name == 'push' && github.event.sender.id == 29139614 && startsWith(github.ref, 'refs/heads/renovate/')",
+    'Only Mend Renovate branch pushes may generate updates',
+  );
+  assert.deepEqual(
+    updateJob.outputs,
+    {
+      base: '${{ steps.outputs.outputs.base }}',
+      changed: '${{ steps.outputs.outputs.changed }}',
+      'artifact-id': '${{ steps.outputs.outputs.artifact-id }}',
+    },
+    'Export validated publishing outputs',
+  );
+  assert.equal(publishJob.needs, 'prepare', 'Publish after preparation');
+  assert.equal(
+    publishJob.uses,
+    `${prefix}workflows/publish-pnpm-artifacts.yml@${revision}`,
+    'Use the same shared publishing revision',
+  );
+  assert.deepEqual(
+    publishJob.with,
+    {
+      base: '${{ needs.prepare.outputs.base }}',
+      changed: '${{ needs.prepare.outputs.changed }}',
+      'artifact-id': '${{ needs.prepare.outputs.artifact-id }}',
+      mise: true,
+      viteplus: true,
+      'app-client-id': '${{ vars.MOONBIT_UPDATER_CLIENT_ID }}',
+    },
+    'Connect publishing outputs and authorize selected components',
+  );
+  assert.deepEqual(
+    publishJob.secrets,
+    {
+      'app-private-key': '${{ secrets.MOONBIT_UPDATER_PRIVATE_KEY }}',
+    },
+    'Pass App credentials only to publishing',
+  );
   const platforms = [...linux, 'macos-arm64', 'windows-x64'];
   const groups = [
     {
@@ -159,7 +241,7 @@ export async function checkDependencies(
       verify: 'regenerate',
     },
   ];
-  for (const inputs of [checkInputs, updateInputs]) {
+  for (const inputs of [object(checkSteps[0]!.with), object(updateSteps[0]!.with)]) {
     assert.deepEqual(
       JSON.parse(String(inputs['lock-groups'])),
       groups,

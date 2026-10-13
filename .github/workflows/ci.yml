@@ -99,14 +99,49 @@ jobs:
           key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}
 
   dependency_artifacts:
-    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@ad62a43426d389afed957747eb45eb7b63e6fabf # main
-    with:
-      verify-only: true
-      sync-vite-plus: true
-      sync-declarations: true
-      lock-groups: >-
-        [{"lockfile":"mise.lock","tools":["conda:gcc","conda:lua","conda:luarocks"],"platforms":["linux-x64","linux-arm64"],"verify":"locked"},
-         {"lockfile":"mise.lock","tools":["actionlint","node","pnpm","shellcheck","stylua","vfox","zizmor"],"platforms":["linux-x64","linux-arm64","macos-arm64","windows-x64"],"verify":"regenerate"}]
+    name: dependency_artifacts / prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MISE_SAFE: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install current mise
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
+        with:
+          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
+          install: false
+          cache: false
+          experimental: true
+
+      - name: Record mise version
+        run: mise --version
+
+      - name: Prepare mise locks and Node toolchain
+        id: mise
+        uses: maya0513/renovate-config/.github/actions/mise-pnpm@51775e2b77381182358d48695fa0fc8dbfe0fa42 # main
+        with:
+          verify-only: "true"
+          lock-groups: >-
+            [{"lockfile":"mise.lock","tools":["conda:gcc","conda:lua","conda:luarocks"],"platforms":["linux-x64","linux-arm64"],"verify":"locked"},
+             {"lockfile":"mise.lock","tools":["actionlint","node","pnpm","shellcheck","stylua","vfox","zizmor"],"platforms":["linux-x64","linux-arm64","macos-arm64","windows-x64"],"verify":"regenerate"}]
+
+      - name: Synchronize the selected Vite+ dependency graph
+        id: viteplus
+        uses: maya0513/renovate-config/.github/actions/pnpm-viteplus@51775e2b77381182358d48695fa0fc8dbfe0fa42 # main
+        with:
+          preparation-state: ${{ steps.mise.outputs.state }}
+
+      - name: Validate dependency outputs
+        id: outputs
+        uses: maya0513/renovate-config/.github/actions/pnpm-outputs@51775e2b77381182358d48695fa0fc8dbfe0fa42 # main
+        with:
+          mise-state: ${{ steps.mise.outputs.state }}
+          viteplus-state: ${{ steps.viteplus.outputs.state }}
 
   mise_e2e:
     name: mise-e2e (${{ matrix.os }}, mise latest)

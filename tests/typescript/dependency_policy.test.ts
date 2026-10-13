@@ -73,7 +73,7 @@ describe('dependency automation contract', () => {
     ['mise.toml', 'os = ["linux"]', 'os = ["windows"]', 'Linux-only'],
     [
       'renovate.json',
-      'local>maya0513/renovate-config//presets/vite-plus',
+      'local>maya0513/renovate-config//presets/viteplus',
       'local>maya0513/renovate-config//presets/other',
       'presets',
     ],
@@ -105,17 +105,84 @@ describe('dependency automation contract', () => {
     ],
     ['pnpm-lock.yaml', `specifier: ${PNPM}`, 'specifier: 99.0.0', 'Package-manager lock'],
     ['pnpm-lock.yaml', `version: ${PNPM}`, 'version: 99.0.0', 'Package-manager lock'],
+    ['.github/workflows/ci.yml', 'id: viteplus', 'id: missing', 'order'],
+    ['.github/workflows/ci.yml', 'id: outputs', 'id: missing', 'order'],
     [
-      '.github/workflows/update-dependencies.yml',
-      'sync-vite-plus: true',
-      'sync-vite-plus: false',
-      'synchronization',
+      '.github/workflows/ci.yml',
+      'pnpm-viteplus@51775e2b77381182358d48695fa0fc8dbfe0fa42',
+      `pnpm-viteplus@${'a'.repeat(40)}`,
+      'revision',
     ],
     [
       '.github/workflows/ci.yml',
-      'sync-declarations: true',
-      'sync-declarations: false',
-      'synchronization',
+      'mise-pnpm@51775e2b77381182358d48695fa0fc8dbfe0fa42',
+      'mise-pnpm@main',
+      'full SHA',
+    ],
+    [
+      '.github/workflows/ci.yml',
+      'steps.mise.outputs.state',
+      'steps.other.outputs.state',
+      'preparation state',
+    ],
+    ['.github/workflows/ci.yml', 'viteplus-state:', 'missing-state:', 'final validation'],
+    [
+      '.github/workflows/ci.yml',
+      '    env:\n      MISE_SAFE: "1"',
+      '    secrets: inherit\n    env:\n      MISE_SAFE: "1"',
+      'secrets',
+    ],
+    ['.github/workflows/ci.yml', 'MISE_SAFE: "1"', 'TOKEN: ${{ secrets.PRIVATE_KEY }}', 'secrets'],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'MISE_SAFE: "1"',
+      'TOKEN: ${{ secrets.PRIVATE_KEY }}',
+      'secrets',
+    ],
+    ['.github/workflows/ci.yml', 'contents: read', 'contents: write', 'read-only'],
+    ['.github/workflows/update-dependencies.yml', 'contents: read', 'contents: write', 'read-only'],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'github.event.sender.id == 29139614',
+      'true',
+      'Mend Renovate',
+    ],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'verify-only: "false"',
+      'verify-only: "true"',
+      'generate artifacts',
+    ],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'base: ${{ steps.outputs.outputs.base }}',
+      'base: wrong',
+      'Export',
+    ],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'needs: prepare',
+      'needs: other',
+      'after preparation',
+    ],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'publish-pnpm-artifacts.yml@51775e2b77381182358d48695fa0fc8dbfe0fa42',
+      `publish-pnpm-artifacts.yml@${'a'.repeat(40)}`,
+      'publishing revision',
+    ],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'artifact-id: ${{ needs.prepare.outputs.artifact-id }}',
+      'artifact-id: wrong',
+      'publishing outputs',
+    ],
+    ['.github/workflows/update-dependencies.yml', 'viteplus: true', 'viteplus: false', 'authorize'],
+    [
+      '.github/workflows/update-dependencies.yml',
+      'app-private-key:',
+      'missing-key:',
+      'App credentials',
     ],
     ['.github/workflows/ci.yml', '"verify":"locked"', '"verify":"regenerate"', 'groups'],
     [
@@ -131,10 +198,20 @@ describe('dependency automation contract', () => {
       'groups',
     ],
     ['.github/workflows/ci.yml', '"macos-arm64","windows-x64"', '"macos-arm64"', 'groups'],
-    ['.github/workflows/ci.yml', 'verify-only: true', 'verify-only: false', 'read-only'],
+    ['.github/workflows/ci.yml', 'verify-only: "true"', 'verify-only: "false"', 'read-only'],
   ])('rejects policy drift in %s: %s', async (name, before, after, message) => {
     await change(name, before, after);
     await expect(checkDependencies(root)).rejects.toThrow(message);
+  });
+
+  it('rejects an absent shared preparation step', async () => {
+    const path = join(root, '.github/workflows/ci.yml');
+    const text = await readFile(path, 'utf8');
+    await writeFile(
+      path,
+      text.replace(/uses: maya0513\/renovate-config\/\.github\/actions\//g, 'uses: other/actions/'),
+    );
+    await expect(checkDependencies(root)).rejects.toThrow('configuration object');
   });
 
   it('checks executable versions, not only declarations', () => {

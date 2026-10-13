@@ -196,24 +196,21 @@ describe('release and Actions policy', () => {
     await expect(checkActions(temporary)).resolves.toBeUndefined();
   });
 
-  it('accepts release comments and only the approved main workflow reference', async () => {
+  it('accepts release comments and only approved main component references', async () => {
     const path = await makeWorkflow(
       temporary,
       'ci.yml',
       `jobs:\n  example:\n    uses: actions/checkout@${'a'.repeat(40)} # v7.0.1\n`,
     );
     await expect(checkActions(temporary)).resolves.toBeUndefined();
-    const reference = `jobs:\n  example:\n    uses: maya0513/renovate-config/.github/workflows/dependency-artifacts.yml@${'a'.repeat(40)} # main\n`;
+    const reference = `jobs:\n  example:\n    uses: maya0513/renovate-config/.github/actions/mise-pnpm@${'a'.repeat(40)} # main\n`;
     await writeFile(path, reference);
     await expect(checkActions(temporary)).resolves.toBeUndefined();
     await writeFile(
       path,
-      reference.replace(
-        'maya0513/renovate-config/.github/workflows/dependency-artifacts.yml',
-        'actions/checkout',
-      ),
+      reference.replace('maya0513/renovate-config/.github/actions/mise-pnpm', 'actions/checkout'),
     );
-    await expect(checkActions(temporary)).rejects.toThrow('approved shared workflow');
+    await expect(checkActions(temporary)).rejects.toThrow('approved shared components');
   });
 
   it('enforces the GitHub App updater identity contract', async () => {
@@ -281,6 +278,35 @@ describe('Node maintenance tooling policy', () => {
     const packageText = await readFile(packagePath, 'utf8');
     await writeFile(packagePath, packageText.replace(/"tar": "[^"]+"/, '"tar": "^7.99.0"'));
     await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
+  });
+
+  it.each(["'", '"'])('accepts equivalent YAML scalar quotes: %s', async (quote) => {
+    await makeMaintenanceConfiguration(temporary);
+    const path = join(temporary, 'pnpm-workspace.yaml');
+    await writeFile(path, (await readFile(path, 'utf8')).replaceAll("'", quote));
+    await expect(checkMaintenanceTooling(temporary)).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ["  - '.'", "  - 'other'"],
+    ['storeDir: .pnpm-store', 'storeDir: other'],
+    ['vite-plus-core@1.', 'vite-plus-core@2.'],
+  ])('rejects workspace policy drift: %s', async (before, after) => {
+    await makeMaintenanceConfiguration(temporary);
+    const path = join(temporary, 'pnpm-workspace.yaml');
+    await writeFile(path, (await readFile(path, 'utf8')).replace(before, after));
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow('Vite/Vitest overrides');
+  });
+
+  it.each([
+    ['[]', 'configuration object'],
+    ['overrides: null', 'Vite/Vitest overrides'],
+    ['overrides: {}\npeerDependencyRules: null', 'peer policy'],
+    ['overrides: {}\npeerDependencyRules: {allowedVersions: null}', 'allowed peer versions'],
+  ])('rejects malformed workspace settings: %s', async (text, message) => {
+    await makeMaintenanceConfiguration(temporary);
+    await writeFile(join(temporary, 'pnpm-workspace.yaml'), text);
+    await expect(checkMaintenanceTooling(temporary)).rejects.toThrow(message);
   });
 
   it('ignores deleted tracked files while validating the present repository', async () => {
