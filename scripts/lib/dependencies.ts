@@ -89,9 +89,9 @@ export async function checkDependencies(
   assert.deepEqual(
     renovate.extends,
     [
-      'local>maya0513/renovate-config',
-      'local>maya0513/renovate-config//presets/mise-pnpm',
-      'local>maya0513/renovate-config//presets/vite-plus',
+      'local>maya0513/renovate-config#0bfed18e17cdcff074edec7eaf386f998747819a',
+      'local>maya0513/renovate-config//presets/mise-pnpm#0bfed18e17cdcff074edec7eaf386f998747819a',
+      'local>maya0513/renovate-config//presets/vite-plus#0bfed18e17cdcff074edec7eaf386f998747819a',
     ],
     'Use the shared default, mise-pnpm and Vite+ presets',
   );
