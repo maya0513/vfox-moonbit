@@ -52,7 +52,7 @@ pnpm vp run e2e:vfox
 | ジョブ | 実行環境 | 検証内容 |
 | --- | --- | --- |
 | `quality` | Ubuntu 24.04 x86_64 | exact manifestの不変性、PRで変わる依存の脆弱性レビュー、全開発ツールの固定情報、`pnpm vp run ci` |
-| `dependency_artifacts` | 共通ワークフロー | 選択済みmiseロックとVite+依存グラフの同期を、認証情報を使わず検証 |
+| `dependency_artifacts` | Ubuntu 24.04 x86_64 | 選択済みmiseロックとVite+依存グラフの同期を、認証情報を使わず検証 |
 | `mise-e2e` | Ubuntu x86_64 / arm64、macOS arm64、Windows x86_64 | mise経由で公式MoonBitをダウンロード、インストール、有効化してテスト用プロジェクトを実行 |
 | `vfox-e2e` | Ubuntu x86_64 / arm64、macOS arm64、Windows x86_64 | 単体のvfox経由で同じ実ダウンロード検証を実行 |
 | `required` | Ubuntu 24.04 x86_64 | 上記4グループがすべて成功したことを一つの結果へ集約 |
@@ -104,11 +104,15 @@ E2E、配布元の最新版検出、リリースはネットワークや外部�
 
 [Renovate設定](../renovate.json)はmaya0513/renovate-configの共通defaultとVite+ presetを継承します。更新は日本時間の火曜日、公開後7日の待機を経て提案されます。non-majorとロック保守は必須CIと必要なCODEOWNERS承認を満たせば自動マージし、major、runner環境、共通ワークフロー参照の変更は手動で確認します。火曜日は更新を受け付ける期間であり、実行時刻やPRが一つになることを保証するものではありません。
 
-npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。共通mise-pnpmプリセットがRenovate自身のmise生成物更新とロック保守を無効にし、miseロックは共通ワークフローに集約します。独立したVite+プリセットも選択し、派生依存の宣言同期を同じワークフローへ任せます。pnpm更新のnpm生成処理は有効のままにし、package manager用のロック文書もRenovateが更新します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通ワークフローはSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
+npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。共通mise-pnpmプリセットがRenovate自身のmise生成物更新とロック保守を無効にし、miseロックは共通mise準備アクションに集約します。独立したVite+プリセットも選択し、派生依存の宣言同期をVite+準備アクションへ任せます。pnpm更新のnpm生成処理は有効のままにし、package manager用のロック文書もRenovateが更新します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通アクションと公開ワークフローは同じSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
 
-[`update-dependencies.yml`](../.github/workflows/update-dependencies.yml)はRenovateブランチへのプッシュ時に共通dependency-artifactsワークフローを呼び出します。選択済みの版からmiseロックを生成し、coverage、Vitest override、Vite core aliasをVite+に同期して、必要な場合だけ追加の1コミットをプッシュします。Vite+の再選択や旧来の一括更新処理は行いません。同梱パッケージの独立更新は止めるため、Vite+経由で未提供の脆弱性修正は手動で対応します。
+[`update-dependencies.yml`](../.github/workflows/update-dependencies.yml)は、1つの準備ジョブで3つの共通アクションを順に実行します。`mise-pnpm`がmiseロックとNode／pnpmを準備し、`pnpm-viteplus`がcoverage、Vitest override、Vite core aliasを選択済みのVite+に同期し、`pnpm-outputs`が全生成物を検証します。準備状態を次の処理へ渡し、検証モードも引き継ぎます。準備はMend Renovateによる`renovate/`ブランチへのプッシュだけで動作し、App認証情報は受け取りません。Vite+の再選択や旧来の一括更新処理は行いません。同梱パッケージの独立更新は止めるため、Vite+経由で未提供の脆弱性修正は手動で対応します。
 
-通常CIも同じ共通ワークフローを検証モードで呼び、結果を`required`に含めます。Appの認証情報は渡しません。両方の呼び出しで、Conda GCC／Lua／LuaRocksはLinux x64／arm64、その他はLinux x64／arm64・macOS arm64・Windows x64を指定します。Condaは記録済みの依存をインストールし、通常CIでは再解決しません。その他は選択済みexact版から再生成して差分を確認します。ツールの漏れ・重複と対象環境の不足も設定検査で拒否します。
+専用の公開ジョブが`publish-pnpm-artifacts.yml`を呼び、検証済みのbase SHA・変更有無・変更不能なartifact IDを渡します。miseとVite+の生成物を明示的に許可し、このジョブだけに既存のApp認証情報を渡します。公開処理はパッチを検査し、元のSHAを条件とするlease付きで必要な場合だけ追加の1コミットをプッシュします。Appのプッシュでは再生成せず、PRのCIが最新SHAを検証します。
+
+通常CIも同じ3つのアクションを検証モードで実行し、結果を`required`に含めます。Appの認証情報は渡しません。両方の呼び出しで、Conda GCC／Lua／LuaRocksはLinux x64／arm64、その他はLinux x64／arm64・macOS arm64・Windows x64を指定します。Condaは記録済みの依存をインストールし、通常CIでは再解決しません。その他は選択済みexact版から再生成して差分を確認します。ツールの漏れ・重複、対象環境の不足、共通リビジョンの不一致、準備状態や公開出力の接続漏れ、準備への認証情報の混入も設定検査で拒否します。
+
+Vite+のプリセット名は`viteplus`です。プリセットは共通`main`を追従し、共通アクションと公開ワークフローの実装は同じレビュー済みの省略しないコミットSHAに固定します。生成される`pnpm-workspace.yaml`の値の書式は共通同期処理に任せ、フォーマッターの対象から外します。リポジトリ検査はYAMLを解析し、引用符の違いによらずstore・override・peer policyを検証します。
 
 npmのロック保守は宣言範囲内で行います。pnpm側に追加の待機設定は設けず、Renovateの7日待機が推移依存やロック保守の全更新に及ぶとは保証しません。依存関係レビューとfrozen installは引き続き必須です。`renovate/artifacts`は診断用であり、通常PRの必須チェックにはしません。
 

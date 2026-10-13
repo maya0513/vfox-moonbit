@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /** Validate repository ownership, supply-chain policy, and tool compatibility. */
 
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { lstat, readFile, readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { parse as parseYaml } from 'yaml';
 
 import { checkDependencies, checkInstalledVersions } from './lib/dependencies.ts';
 
@@ -224,11 +227,11 @@ export async function checkActions(repository: string): Promise<void> {
     for (const line of text.split('\n')) {
       if (
         /uses:.*#\s+main\s*$/.test(line) &&
-        !/uses:\s+maya0513\/renovate-config\/\.github\/workflows\/dependency-artifacts\.yml@/.test(
+        !/uses:\s+maya0513\/renovate-config\/\.github\/(?:actions\/(?:mise-pnpm|pnpm-viteplus|pnpm-outputs)|workflows\/publish-pnpm-artifacts\.yml)@/.test(
           line,
         )
       ) {
-        throw new RepositoryError('Only the approved shared workflow may follow main');
+        throw new RepositoryError('Only approved shared components may follow main');
       }
     }
     let miseCount = 0;
@@ -353,16 +356,24 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     );
   }
 
-  const workspace = await readFile(join(repository, 'pnpm-workspace.yaml'), 'utf8');
-  const requiredWorkspaceSettings = [
-    "  - '.'",
-    'storeDir: .pnpm-store',
-    `  'vitest@*': '${coverageVersion}'`,
-    "    vite: '1'",
-  ];
+  const workspace: unknown = parseYaml(
+    await readFile(join(repository, 'pnpm-workspace.yaml'), 'utf8'),
+  );
+  assert(isRecord(workspace), 'pnpm workspace must contain a configuration object');
+  assert(isRecord(workspace.overrides), 'pnpm workspace needs Vite/Vitest overrides');
+  assert(isRecord(workspace.peerDependencyRules), 'pnpm workspace needs a peer policy');
+  assert(
+    isRecord(workspace.peerDependencyRules.allowedVersions),
+    'pnpm workspace needs allowed peer versions',
+  );
   if (
-    requiredWorkspaceSettings.some((setting) => !workspace.includes(setting)) ||
-    !/^  'vite@\*': 'npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+'$/m.test(workspace)
+    JSON.stringify(workspace.packages) !== JSON.stringify(['.']) ||
+    workspace.storeDir !== '.pnpm-store' ||
+    workspace.overrides['vitest@*'] !== coverageVersion ||
+    !/^npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+$/.test(
+      String(workspace.overrides['vite@*']),
+    ) ||
+    workspace.peerDependencyRules.allowedVersions.vite !== '1'
   ) {
     throw new RepositoryError(
       'pnpm workspace must configure the approved store, aligned Vite/Vitest overrides, and peer policy',

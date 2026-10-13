@@ -43,6 +43,7 @@ export default defineConfig({
       '.github/**',
       'lib/sha2.lua',
       'mise.lock',
+      'pnpm-workspace.yaml', // Shared Vite+ generation owns its scalar formatting.
       'releases/**',
       'upstream/**',
       'vendor-lock.json',
