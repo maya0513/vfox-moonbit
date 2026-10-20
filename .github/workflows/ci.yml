@@ -16,7 +16,7 @@ concurrency:
 jobs:
   quality:
     name: quality
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - name: Check out source
@@ -100,7 +100,7 @@ jobs:
 
   dependency_artifacts:
     name: dependency_artifacts / prepare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
       MISE_SAFE: "1"
@@ -249,7 +249,7 @@ jobs:
     name: required
     if: ${{ always() }}
     needs: [quality, dependency_artifacts, mise_e2e, vfox_e2e]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions: {}
     steps:

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   update:
     name: discover and propose
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       actions: read # Read the immediately previous run's partial-state artifact.
@@ -287,7 +287,7 @@ jobs:
     name: report three consecutive failures
     if: failure()
     needs: update
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: read # Inspect the conclusions of the two preceding updater runs.
       issues: write # Open one issue when the third consecutive run fails.
