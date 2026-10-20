@@ -7,7 +7,7 @@
     "@types/node": "^24.19.1",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.5",
     "smol-toml": "^1.9.1",
     "tar": "^7.5.22",
     "vite-plus": "^1.0.0",
