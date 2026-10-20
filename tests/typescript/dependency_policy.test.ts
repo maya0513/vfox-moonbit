@@ -38,15 +38,26 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-async function change(name: string, before: string, after: string): Promise<void> {
+async function change(name: string, before: string | RegExp, after: string): Promise<void> {
   const path = join(root, name);
   const text = await readFile(path, 'utf8');
-  expect(text).toContain(before);
+  expect(text).toMatch(before);
   await writeFile(path, text.replace(before, after));
 }
 
 describe('dependency automation contract', () => {
   it('accepts exact tools, synchronized declarations and identical generation groups', async () => {
+    await expect(checkDependencies(root)).resolves.toEqual({ node: NODE, pnpm: PNPM });
+  });
+
+  it('accepts synchronized shared component SHA updates', async () => {
+    for (const name of ['ci', 'update-dependencies']) {
+      await change(
+        `.github/workflows/${name}.yml`,
+        /(?<=uses: maya0513\/renovate-config\/\S+@)[a-f0-9]{40}/g,
+        'b'.repeat(40),
+      );
+    }
     await expect(checkDependencies(root)).resolves.toEqual({ node: NODE, pnpm: PNPM });
   });
 
@@ -109,16 +120,11 @@ describe('dependency automation contract', () => {
     ['.github/workflows/ci.yml', 'id: outputs', 'id: missing', 'order'],
     [
       '.github/workflows/ci.yml',
-      'pnpm-viteplus@51775e2b77381182358d48695fa0fc8dbfe0fa42',
+      /pnpm-viteplus@[a-f0-9]{40}/,
       `pnpm-viteplus@${'a'.repeat(40)}`,
       'revision',
     ],
-    [
-      '.github/workflows/ci.yml',
-      'mise-pnpm@51775e2b77381182358d48695fa0fc8dbfe0fa42',
-      'mise-pnpm@main',
-      'full SHA',
-    ],
+    ['.github/workflows/ci.yml', /mise-pnpm@[a-f0-9]{40}/, 'mise-pnpm@main', 'full SHA'],
     [
       '.github/workflows/ci.yml',
       'steps.mise.outputs.state',
@@ -167,7 +173,7 @@ describe('dependency automation contract', () => {
     ],
     [
       '.github/workflows/update-dependencies.yml',
-      'publish-pnpm-artifacts.yml@51775e2b77381182358d48695fa0fc8dbfe0fa42',
+      /publish-pnpm-artifacts\.yml@[a-f0-9]{40}/,
       `publish-pnpm-artifacts.yml@${'a'.repeat(40)}`,
       'publishing revision',
     ],
