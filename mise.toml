@@ -13,7 +13,7 @@ actionlint = "1.7.12"
 node = "24.21.0"
 pnpm = "12.10.0"
 shellcheck = "0.11.0"
-stylua = "2.5.2"
+stylua = "2.6.0"
 vfox = "1.0.12"
 zizmor = "1.30.1"
 
