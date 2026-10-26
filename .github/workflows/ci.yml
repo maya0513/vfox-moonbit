@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  MISE_AUTO_INSTALL: "false" # Each job explicitly installs its locked tool subset.
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -68,7 +71,9 @@ jobs:
       - name: Resolve pnpm store path
         id: pnpm-store
         shell: bash
-        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(pnpm store path)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -176,7 +181,9 @@ jobs:
       - name: Resolve pnpm store path
         id: pnpm-store
         shell: bash
-        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(pnpm store path)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -226,7 +233,9 @@ jobs:
       - name: Resolve pnpm store path
         id: pnpm-store
         shell: bash
-        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+        run: |
+          store_path="$(pnpm store path)"
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
       - name: Cache the pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6

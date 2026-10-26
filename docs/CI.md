@@ -22,6 +22,8 @@ pnpm vp run ci
 
 CI runs formatting, linting, and unit tests with coverage through the `check` task, then adds documentation, manifest, and package validation. The development task `test:unit` runs the same tests without collecting coverage, so CI does not invoke it a second time.
 
+Each CI job explicitly installs its required tools from the lock. `MISE_AUTO_INSTALL=false` disables automatic installation through shims and task startup.
+
 Node formatting checks use `vp fmt --check`; lint and type checks use `vp lint`. Type checking is enabled by `typeCheck: true` in `vite.config.ts`.
 
 Real-download E2E tests use the official CDN and tool-manager state, so they are deliberately separate from `ci`. Run the required backend explicitly:
@@ -119,6 +121,8 @@ Renovate also refreshes npm locks within declared ranges. pnpm has no additional
 ## Updating Lua test dependencies
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml) runs every Monday at 03:30 JST and on manual dispatch. `mise run update:lua` updates only Lua rocks within the Busted 2, LuaCov 0.16 and Luacheck 1 series, recording versions, rockspec SHA-256 values and extracted source-tree SHA-256 values. Changed content for an already locked version stops the update.
+
+The workflow prepares only Node, GCC, Lua and LuaRocks with `mise install --locked`. It uses `--skip-tools` at task startup to prevent unrelated automatic tool installation from changing `mise.lock`.
 
 Only `lua-rocks.lock` may change. Updates use the single `automation/lua-rocks` branch and a weekly PR for manual review. npm, mise and workflow changes are rejected. The MoonBit daily updater remains independent of Renovate.
 

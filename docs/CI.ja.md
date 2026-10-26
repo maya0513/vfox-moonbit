@@ -22,6 +22,8 @@ pnpm vp run ci
 
 CIは`check`タスクでフォーマット、リント、カバレッジ付きのユニットテストを実行し、文書・マニフェスト・パッケージの検証を追加します。開発用の`test:unit`はカバレッジを収集せずに同じテストを実行するため、CIからは重ねて呼びません。
 
+CIでは各ジョブに必要なツールをlocked installで明示的に準備し、`MISE_AUTO_INSTALL=false`でshimやタスク起動時の自動インストールを停止します。
+
 Node側のフォーマット検査には`vp fmt --check`、リントと型検査には`vp lint`を使います。型検査は`vite.config.ts`の`typeCheck: true`で有効にしています。
 
 実際の公式CDNとツールマネージャーを使うE2Eは、ネットワークと利用者の状態へ依存するため`ci`には含まれません。必要なバックエンドを個別に実行します。
@@ -119,6 +121,8 @@ npmのロック保守は宣言範囲内で行います。pnpm側に追加の待�
 ## Luaのテスト依存の更新
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml)は毎週月曜日03:30 JSTと手動実行で起動します。`mise run update:lua`がBusted 2、LuaCov 0.16、Luacheck 1の互換系列内でLua rocksだけを更新し、バージョン、rockspecのSHA-256、展開したソースのSHA-256を記録します。同じ版の内容が変わった場合は停止します。
+
+ワークフローは必要なNode・GCC・Lua・LuaRocksを`mise install --locked`で準備します。タスク起動時には`--skip-tools`で自動インストールを省き、無関係なツールの準備に伴う`mise.lock`の変更を防ぎます。
 
 変更できるのは`lua-rocks.lock`だけです。`automation/lua-rocks`の単一ブランチで週1回の手動レビュー用PRを管理し、npm・mise・ワークフローの変更は拒否します。MoonBitの日次更新はRenovateから独立して継続します。
 

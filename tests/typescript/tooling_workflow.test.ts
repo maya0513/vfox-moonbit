@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -6,7 +7,9 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
+import { parse } from 'yaml';
 
+import { isRecord } from '../../scripts/lib/common.ts';
 import { REPOSITORY } from './fixtures.ts';
 
 const execute = promisify(execFile);
@@ -56,6 +59,68 @@ async function commit(cwd: string, message: string): Promise<void> {
 }
 
 describe('weekly maintenance workflow', () => {
+  it('runs the Lua update without installing unrelated configured tools or changing mise.lock', async () => {
+    const workflow: unknown = parse(
+      await readFile(join(REPOSITORY, '.github/workflows/update-lua-rocks.yml'), 'utf8'),
+    );
+    assert(
+      isRecord(workflow) &&
+        isRecord(workflow.jobs) &&
+        isRecord(workflow.jobs.update) &&
+        Array.isArray(workflow.jobs.update.steps),
+    );
+    const steps: unknown[] = workflow.jobs.update.steps;
+    const install = steps.findIndex(
+      (step) => isRecord(step) && step.name === 'Install locked Lua lock-generation tools',
+    );
+    const refresh = steps.findIndex(
+      (step) => isRecord(step) && step.name === 'Refresh compatible Lua rocks',
+    );
+    expect(install).toBeGreaterThanOrEqual(0);
+    expect(refresh).toBeGreaterThan(install);
+    const installStep = steps[install];
+    const refreshStep = steps[refresh];
+    assert(isRecord(installStep) && isRecord(refreshStep));
+    expect(installStep.run).toBe('mise install --locked node conda:gcc conda:lua conda:luarocks');
+    const command = refreshStep.run;
+    assert(typeof command === 'string');
+
+    const repository = join(temporary, 'isolated project');
+    await mkdir(repository);
+    const globalConfig = join(temporary, 'global.toml');
+    await writeFile(globalConfig, '');
+    await writeFile(
+      join(repository, 'mise.toml'),
+      `[settings]
+experimental = true
+lockfile = true
+[tools]
+node = "0.0.0"
+[tasks."update:lua"]
+run = "printf refreshed > lua-rocks.lock"
+`,
+    );
+    const lock = '# Existing mise lock must remain byte-identical.\n';
+    await writeFile(join(repository, 'mise.lock'), lock);
+    await execute('bash', ['-euo', 'pipefail', '-c', command], {
+      cwd: repository,
+      env: {
+        ...environment(),
+        MISE_GLOBAL_CONFIG_FILE: globalConfig,
+        MISE_SYSTEM_CONFIG_FILE: globalConfig,
+        MISE_DATA_DIR: join(temporary, 'mise-data'),
+        MISE_STATE_DIR: join(temporary, 'mise-state'),
+        MISE_CACHE_DIR: join(temporary, 'mise-cache'),
+        MISE_TRUSTED_CONFIG_PATHS: repository,
+        MISE_OFFLINE: '1',
+        MISE_AUTO_INSTALL: 'true',
+      },
+      timeout: 15000,
+    });
+    expect(await readFile(join(repository, 'lua-rocks.lock'), 'utf8')).toBe('refreshed');
+    expect(await readFile(join(repository, 'mise.lock'), 'utf8')).toBe(lock);
+  });
+
   it('rejects every change outside the Lua lock before staging or pushing', async () => {
     const workflow = await readFile(
       join(REPOSITORY, '.github/workflows/update-lua-rocks.yml'),
@@ -259,5 +324,36 @@ done
       },
     });
     expect((await readFile(built, 'utf8')).trim()).toMatch(/\/fixture-1\.0-1\/source$/);
+  });
+});
+
+describe('CI tool provisioning', () => {
+  it('fails immediately when pnpm cannot resolve its store path', async () => {
+    const workflow: unknown = parse(
+      await readFile(join(REPOSITORY, '.github/workflows/ci.yml'), 'utf8'),
+    );
+    assert(isRecord(workflow) && isRecord(workflow.jobs));
+    const bin = join(temporary, 'bin');
+    await mkdir(bin);
+    await writeFile(join(bin, 'pnpm'), '#!/usr/bin/env bash\nexit 73\n', { mode: 0o755 });
+    for (const job of Object.values(workflow.jobs)) {
+      assert(isRecord(job));
+      if (!Array.isArray(job.steps)) continue;
+      const steps: unknown[] = job.steps;
+      const store = steps.find((step) => isRecord(step) && step.name === 'Resolve pnpm store path');
+      if (store === undefined) continue;
+      assert(isRecord(store) && typeof store.run === 'string');
+      await expect(
+        execute('bash', ['-euo', 'pipefail', '-c', store.run], {
+          env: {
+            ...environment(),
+            PATH: `${bin}:${process.env.PATH}`,
+            GITHUB_OUTPUT: join(temporary, 'output'),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 73 });
+    }
+    assert(isRecord(workflow.env));
+    expect(workflow.env.MISE_AUTO_INSTALL).toBe('false');
   });
 });
