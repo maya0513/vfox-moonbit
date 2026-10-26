@@ -317,53 +317,53 @@ conda_deps = [
 ]
 
 [[tools.node]]
-version = "24.21.0"
+version = "24.22.1"
 backend = "core:node"
-specifiers = ["24.21.0"]
+specifiers = ["24.22.1"]
 
 [tools.node."platforms.linux-arm64"]
-checksum = "sha256:724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5"
-url = "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-arm64.tar.gz"
+checksum = "sha256:33c37be234ba8bee041961047b19160f4d7d0f164e8e246f78bdd10feff148b3"
+url = "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-arm64.tar.gz"
 
 [tools.node."platforms.linux-x64"]
-checksum = "sha256:6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff"
-url = "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz"
+checksum = "sha256:eb6728e77c576a35162c122c45ccadf224d89ff00abc8dae46cc2897c6002d7c"
+url = "https://nodejs.org/dist/v24.22.1/node-v24.22.1-linux-x64.tar.gz"
 
 [tools.node."platforms.macos-arm64"]
-checksum = "sha256:bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057"
-url = "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz"
+checksum = "sha256:89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7"
+url = "https://nodejs.org/dist/v24.22.1/node-v24.22.1-darwin-arm64.tar.gz"
 
 [tools.node."platforms.windows-x64"]
-checksum = "sha256:158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541"
-url = "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip"
+checksum = "sha256:d2046d28c2c3dcd211ac5145c0bf30e2047ef9dfb306693c8c6e2eccd8b95fa5"
+url = "https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip"
 
 [[tools.pnpm]]
-version = "12.13.0"
+version = "12.14.0"
 backend = "aqua:pnpm/pnpm"
-specifiers = ["12.13.0"]
+specifiers = ["12.14.0"]
 
 [tools.pnpm."platforms.linux-arm64"]
-checksum = "sha256:1e1b4d7ddef2577d7b50444a30b76bf4f62dcb45039ef0c4454a377384a36618"
-url = "https://github.com/pnpm/pnpm/releases/download/v12.13.0/pnpm-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/636319805"
+checksum = "sha256:cfc780b9e690549e6633e1045fb1fb6ef84e390711e2099e6ccbae91c32456ea"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.14.0/pnpm-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/643957409"
 provenance = "github-attestations"
 
 [tools.pnpm."platforms.linux-x64"]
-checksum = "sha256:7a796532f2b8801e7fab92389cb02c7ada0cdfbaaded5d291052d83e52c06047"
-url = "https://github.com/pnpm/pnpm/releases/download/v12.13.0/pnpm-linux-x64.tar.gz"
-url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/636319815"
+checksum = "sha256:3910c3852136bed5bc1511b9137a45fd4357ed6b3970d9d08893641e9005867e"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.14.0/pnpm-linux-x64.tar.gz"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/643957410"
 provenance = "github-attestations"
 
 [tools.pnpm."platforms.macos-arm64"]
-checksum = "sha256:697961ea2f337fff60bd59ed25991d6165826751bc75ee4b7fad6923b7584c6e"
-url = "https://github.com/pnpm/pnpm/releases/download/v12.13.0/pnpm-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/636319811"
+checksum = "sha256:50f48e0e17508952790a3fbf58fcf14f3b82efa5f594ca04ad904e29aaf854b0"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.14.0/pnpm-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/643957413"
 provenance = "github-attestations"
 
 [tools.pnpm."platforms.windows-x64"]
-checksum = "sha256:7e235180c70c0fc6f7805af1a19a3c277d7c30ce2db17045f5dd430e37ee582e"
-url = "https://github.com/pnpm/pnpm/releases/download/v12.13.0/pnpm-win32-x64.zip"
-url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/636319814"
+checksum = "sha256:6f0f38e917c8ce76ef31db528c357e2bfa354a1bcb16464e3cdec39e6530d784"
+url = "https://github.com/pnpm/pnpm/releases/download/v12.14.0/pnpm-win32-x64.zip"
+url_api = "https://api.github.com/repos/pnpm/pnpm/releases/assets/643957404"
 provenance = "github-attestations"
 
 [[tools.shellcheck]]
@@ -417,59 +417,59 @@ url = "https://github.com/JohnnyMorganz/StyLua/releases/download/v2.6.0/stylua-w
 url_api = "https://api.github.com/repos/JohnnyMorganz/StyLua/releases/assets/628186216"
 
 [[tools.vfox]]
-version = "1.0.12"
+version = "1.0.13"
 backend = "aqua:version-fox/vfox"
-specifiers = ["1.0.12"]
+specifiers = ["1.0.13"]
 
 [tools.vfox."platforms.linux-arm64"]
-checksum = "sha256:85186780b260d124aa53cebc5808ed29e15ed0572886f229de4a8d0899645cfe"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.12/vfox_1.0.12_linux_aarch64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/546947535"
+checksum = "sha256:7cec88e6e9be551cb138e061d37521286d34096fdc0c4fdb65d89cef30c58583"
+url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_linux_aarch64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211190"
 provenance = "cosign"
 
 [tools.vfox."platforms.linux-x64"]
-checksum = "sha256:7d4a504bbec0cec1072eabd8c5ab680852ea70e971280eba006066bde378a9bd"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.12/vfox_1.0.12_linux_x86_64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/546947526"
+checksum = "sha256:7ad0a4c82c8173f09393e09abecc3e27468253bab5fe53ffbf58f2b12b3fc768"
+url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211282"
 provenance = "cosign"
 
 [tools.vfox."platforms.macos-arm64"]
-checksum = "sha256:aab23403d465806ba532d3b7b882cba3b3685a8d995e6ec888518515ee623f7f"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.12/vfox_1.0.12_macos_aarch64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/546947510"
+checksum = "sha256:9f040c5b2cef37c0ce4fb772e552b52be0ed1bcd9b63d2c6aaf4d59f5cc99a05"
+url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_macos_aarch64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211191"
 provenance = "cosign"
 
 [tools.vfox."platforms.windows-x64"]
-checksum = "sha256:0dd8285f636419a538a65b1a2bb7242e6fac5f50d9fdf3b479f517610846110e"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.12/vfox_1.0.12_windows_x86_64.zip"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/546947522"
+checksum = "sha256:dab9f12aa1139eb4a055afccbfa2b970b389e1fd3f14c94e9e6793ae5fc66e0a"
+url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_windows_x86_64.zip"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211252"
 provenance = "cosign"
 
 [[tools.zizmor]]
-version = "1.30.1"
+version = "1.31.1"
 backend = "aqua:zizmorcore/zizmor"
-specifiers = ["1.30.1"]
+specifiers = ["1.31.1"]
 
 [tools.zizmor."platforms.linux-arm64"]
-checksum = "sha256:7ff1dce33bdd18fd2a4affe63bdd47efcccca97b2cec1c1863ec26e9e2647540"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067643"
+checksum = "sha256:37eebbd5762a44f262d94875431b14a6d2402991e90a685113ea97b8b41be833"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/645467282"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-x64"]
-checksum = "sha256:e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067642"
+checksum = "sha256:d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/645467284"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-arm64"]
-checksum = "sha256:e28d22b087f9ebb8d99da6e740d348c930f559961c7c3f12badda54f882195a2"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067640"
+checksum = "sha256:ad5aa633cd56215b11e6c51d51f90c7e6b22904a75047d1215abbd422f61d698"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/645467283"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.windows-x64"]
-checksum = "sha256:b183b1e996eddfab9659f1e9b46e059f1ef1cf984a1f14e5da09f7876a4b3a1c"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067645"
+checksum = "sha256:4de30371c8a3b483aecbcf0dec1fd6a2b6aae65051ca226b4f6527baac6a8c7a"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/645467286"
 provenance = "github-attestations"
