@@ -118,6 +118,8 @@ The Vite+ preset is named `viteplus`. Presets follow shared `main`; all shared a
 
 Renovate also refreshes npm locks within declared ranges. pnpm has no additional cooldown configured here: Renovate's seven-day check does not guarantee the age of every transitive dependency or lock-maintenance update. Dependency review and frozen installation remain required. `renovate/artifacts` is diagnostic, not a required check for ordinary PRs.
 
+Lock records contain only the platforms assigned to each group; CI rejects out-of-group entries.
+
 ## Updating Lua test dependencies
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml) runs every Monday at 03:30 JST and on manual dispatch. `mise run update:lua` updates only Lua rocks within the Busted 2, LuaCov 0.16 and Luacheck 1 series, recording versions, rockspec SHA-256 values and extracted source-tree SHA-256 values. Changed content for an already locked version stops the update.
