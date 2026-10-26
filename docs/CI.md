@@ -22,6 +22,8 @@ pnpm vp run ci
 
 CI runs formatting, linting, and unit tests with coverage through the `check` task, then adds documentation, manifest, and package validation. The development task `test:unit` runs the same tests without collecting coverage, so CI does not invoke it a second time.
 
+Each CI job explicitly installs its required tools from the lock. `MISE_AUTO_INSTALL=false` disables automatic installation through shims and task startup.
+
 Node formatting checks use `vp fmt --check`; lint and type checks use `vp lint`. Type checking is enabled by `typeCheck: true` in `vite.config.ts`.
 
 Real-download E2E tests use the official CDN and tool-manager state, so they are deliberately separate from `ci`. Run the required backend explicitly:

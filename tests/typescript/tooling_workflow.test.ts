@@ -113,6 +113,7 @@ run = "printf refreshed > lua-rocks.lock"
         MISE_CACHE_DIR: join(temporary, 'mise-cache'),
         MISE_TRUSTED_CONFIG_PATHS: repository,
         MISE_OFFLINE: '1',
+        MISE_AUTO_INSTALL: 'true',
       },
       timeout: 15000,
     });
@@ -323,5 +324,36 @@ done
       },
     });
     expect((await readFile(built, 'utf8')).trim()).toMatch(/\/fixture-1\.0-1\/source$/);
+  });
+});
+
+describe('CI tool provisioning', () => {
+  it('fails immediately when pnpm cannot resolve its store path', async () => {
+    const workflow: unknown = parse(
+      await readFile(join(REPOSITORY, '.github/workflows/ci.yml'), 'utf8'),
+    );
+    assert(isRecord(workflow) && isRecord(workflow.jobs));
+    const bin = join(temporary, 'bin');
+    await mkdir(bin);
+    await writeFile(join(bin, 'pnpm'), '#!/usr/bin/env bash\nexit 73\n', { mode: 0o755 });
+    for (const job of Object.values(workflow.jobs)) {
+      assert(isRecord(job));
+      if (!Array.isArray(job.steps)) continue;
+      const steps: unknown[] = job.steps;
+      const store = steps.find((step) => isRecord(step) && step.name === 'Resolve pnpm store path');
+      if (store === undefined) continue;
+      assert(isRecord(store) && typeof store.run === 'string');
+      await expect(
+        execute('bash', ['-euo', 'pipefail', '-c', store.run], {
+          env: {
+            ...environment(),
+            PATH: `${bin}:${process.env.PATH}`,
+            GITHUB_OUTPUT: join(temporary, 'output'),
+          },
+        }),
+      ).rejects.toMatchObject({ code: 73 });
+    }
+    assert(isRecord(workflow.env));
+    expect(workflow.env.MISE_AUTO_INSTALL).toBe('false');
   });
 });
