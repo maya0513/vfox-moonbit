@@ -10,7 +10,7 @@ actionlint = "1.7.12"
 "conda:gcc" = { version = "16.2.0", os = ["linux"] }
 "conda:lua" = { version = "5.1.5", os = ["linux"] }
 "conda:luarocks" = { version = "3.13.0", os = ["linux"] }
-node = "24.21.0"
+node = "24.22.0"
 pnpm = "12.13.0"
 shellcheck = "0.11.0"
 stylua = "2.6.0"
