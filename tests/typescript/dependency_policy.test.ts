@@ -62,6 +62,18 @@ describe('dependency automation contract', () => {
   });
 
   it.each([
+    ['node', 'windows-arm64'],
+    ['conda:lua', 'windows-x64'],
+  ])('rejects a lock platform outside its generation group: %s / %s', async (tool, platform) => {
+    const path = join(root, 'mise.lock');
+    await writeFile(
+      path,
+      `${await readFile(path, 'utf8')}\n[tools."${tool}"."platforms.${platform}"]\nurl = "https://example.test/unmanaged"\n`,
+    );
+    await expect(checkDependencies(root)).rejects.toThrow('lock platforms');
+  });
+
+  it.each([
     ['mise.toml', `node = "${NODE}"`, 'node = "24"', 'exact'],
     ['mise.toml', `node = "${NODE}"`, 'node = true', 'exact'],
     ['mise.toml', `node = "${NODE}"`, 'node = { version = "24" }', 'exact'],

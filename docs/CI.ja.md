@@ -118,6 +118,8 @@ Vite+のプリセット名は`viteplus`です。プリセットは共通`main`�
 
 npmのロック保守は宣言範囲内で行います。pnpm側に追加の待機設定は設けず、Renovateの7日待機が推移依存やロック保守の全更新に及ぶとは保証しません。依存関係レビューとfrozen installは引き続き必須です。`renovate/artifacts`は診断用であり、通常PRの必須チェックにはしません。
 
+ロックファイルも各グループの対象環境だけを保持し、対象外のエントリはCIで拒否します。
+
 ## Luaのテスト依存の更新
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml)は毎週月曜日03:30 JSTと手動実行で起動します。`mise run update:lua`がBusted 2、LuaCov 0.16、Luacheck 1の互換系列内でLua rocksだけを更新し、バージョン、rockspecのSHA-256、展開したソースのSHA-256を記録します。同じ版の内容が変わった場合は停止します。

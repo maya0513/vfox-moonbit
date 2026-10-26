@@ -248,6 +248,19 @@ export async function checkDependencies(
       'Lock groups must cover tools, platforms and validation modes identically',
     );
   }
+  for (const group of groups) {
+    for (const name of group.tools) {
+      const record = object(array(locks[name])[0]);
+      assert.deepEqual(
+        Object.keys(record)
+          .filter((key) => key.startsWith('platforms.'))
+          .map((key) => key.slice('platforms.'.length))
+          .toSorted(),
+        group.platforms.toSorted(),
+        `${name} lock platforms must match its generation group`,
+      );
+    }
+  }
   assert(
     array(object(ciJobs.required).needs).includes('dependency_artifacts'),
     'Require dependency artifact validation',
