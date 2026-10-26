@@ -6,7 +6,7 @@ pmOnFail: error
 storeDir: .pnpm-store
 
 overrides:
-  "vite@*": "npm:@voidzero-dev/vite-plus-core@1.3.0"
+  "vite@*": "npm:@voidzero-dev/vite-plus-core@1.4.0"
   "vitest@*": "5.0.5"
 
 peerDependencyRules:
