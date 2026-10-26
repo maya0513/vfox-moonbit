@@ -487,7 +487,7 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     'utf8',
   );
   for (const contract of [
-    'mise run update:lua',
+    'mise run --skip-tools update:lua',
     'mise install --locked node conda:gcc conda:lua conda:luarocks',
     'lua-rocks.lock) ;;',
     'git add -- lua-rocks.lock',

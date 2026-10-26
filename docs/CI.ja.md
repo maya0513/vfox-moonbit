@@ -120,6 +120,8 @@ npmのロック保守は宣言範囲内で行います。pnpm側に追加の待�
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml)は毎週月曜日03:30 JSTと手動実行で起動します。`mise run update:lua`がBusted 2、LuaCov 0.16、Luacheck 1の互換系列内でLua rocksだけを更新し、バージョン、rockspecのSHA-256、展開したソースのSHA-256を記録します。同じ版の内容が変わった場合は停止します。
 
+ワークフローは必要なNode・GCC・Lua・LuaRocksを`mise install --locked`で準備します。タスク起動時には`--skip-tools`で自動インストールを省き、無関係なツールの準備に伴う`mise.lock`の変更を防ぎます。
+
 変更できるのは`lua-rocks.lock`だけです。`automation/lua-rocks`の単一ブランチで週1回の手動レビュー用PRを管理し、npm・mise・ワークフローの変更は拒否します。MoonBitの日次更新はRenovateから独立して継続します。
 
 ## プラグインのリリース

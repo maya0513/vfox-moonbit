@@ -120,6 +120,8 @@ Renovate also refreshes npm locks within declared ranges. pnpm has no additional
 
 [`update-lua-rocks.yml`](../.github/workflows/update-lua-rocks.yml) runs every Monday at 03:30 JST and on manual dispatch. `mise run update:lua` updates only Lua rocks within the Busted 2, LuaCov 0.16 and Luacheck 1 series, recording versions, rockspec SHA-256 values and extracted source-tree SHA-256 values. Changed content for an already locked version stops the update.
 
+The workflow prepares only Node, GCC, Lua and LuaRocks with `mise install --locked`. It uses `--skip-tools` at task startup to prevent unrelated automatic tool installation from changing `mise.lock`.
+
 Only `lua-rocks.lock` may change. Updates use the single `automation/lua-rocks` branch and a weekly PR for manual review. npm, mise and workflow changes are rejected. The MoonBit daily updater remains independent of Renovate.
 
 ## Releasing the plugin
