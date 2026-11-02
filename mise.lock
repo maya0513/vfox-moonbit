@@ -194,10 +194,7 @@ provenance = "github-attestations"
 [[tools."conda:gcc"]]
 version = "16.2.0"
 backend = "conda:gcc"
-specifiers = [
-    "16",
-    "16.2.0",
-]
+specifiers = ["16.2.0"]
 
 [tools."conda:gcc".options]
 channel = "conda-forge"
@@ -249,10 +246,7 @@ conda_deps = [
 [[tools."conda:lua"]]
 version = "5.1.5"
 backend = "conda:lua"
-specifiers = [
-    "5.1",
-    "5.1.5",
-]
+specifiers = ["5.1.5"]
 
 [tools."conda:lua".options]
 channel = "conda-forge"
@@ -282,10 +276,7 @@ conda_deps = [
 [[tools."conda:luarocks"]]
 version = "3.13.0"
 backend = "conda:luarocks"
-specifiers = [
-    "3",
-    "3.13.0",
-]
+specifiers = ["3.13.0"]
 
 [tools."conda:luarocks".options]
 channel = "conda-forge"
