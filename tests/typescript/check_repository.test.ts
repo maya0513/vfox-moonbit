@@ -253,6 +253,19 @@ describe('release and Actions policy', () => {
     await writeFile(path, original.replace('run: mise --version', 'run: echo missing'));
     await expect(checkActions(temporary)).rejects.toThrow('actual mise version');
   });
+
+  it('pins only dependency preparation to its validated mise release', async () => {
+    const original = await readFile(join(REPOSITORY, '.github/workflows/ci.yml'), 'utf8');
+    const path = await makeWorkflow(temporary, 'ci.yml', original);
+    for (const changed of [
+      original.replace('version: "2026.10.25"', 'version: "2026.11.0"'),
+      original.replace('version: "2026.10.25"', ''),
+      original.replace('  dependency_artifacts:', '  unrelated:'),
+    ]) {
+      await writeFile(path, changed);
+      await expect(checkActions(temporary)).rejects.toThrow(/validated mise|latest stable mise/);
+    }
+  });
 });
 
 describe('Node maintenance tooling policy', () => {

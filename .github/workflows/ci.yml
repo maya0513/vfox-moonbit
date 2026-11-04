@@ -115,10 +115,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install current mise
+      - name: Install validated mise for dependency preparation
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
-          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
+          # mise 2026.11.0 safe mode rejects the recorded Conda graph (jdx/mise#15235).
+          version: "2026.10.25"
+          minimum_release_age: "0s"
           install: false
           cache: false
           experimental: true
@@ -128,7 +130,7 @@ jobs:
 
       - name: Prepare mise locks and Node toolchain
         id: mise
-        uses: maya0513/renovate-config/.github/actions/mise-pnpm@45624ee30764a094585777c45f6bcf2298ee433c # main
+        uses: maya0513/renovate-config/.github/actions/mise-pnpm@c23fac84b4008c769ab5b8547bdd0f582038af7a # main
         with:
           verify-only: "true"
           lock-groups: >-
@@ -137,13 +139,13 @@ jobs:
 
       - name: Synchronize the selected Vite+ dependency graph
         id: viteplus
-        uses: maya0513/renovate-config/.github/actions/pnpm-viteplus@45624ee30764a094585777c45f6bcf2298ee433c # main
+        uses: maya0513/renovate-config/.github/actions/pnpm-viteplus@c23fac84b4008c769ab5b8547bdd0f582038af7a # main
         with:
           preparation-state: ${{ steps.mise.outputs.state }}
 
       - name: Validate dependency outputs
         id: outputs
-        uses: maya0513/renovate-config/.github/actions/pnpm-outputs@45624ee30764a094585777c45f6bcf2298ee433c # main
+        uses: maya0513/renovate-config/.github/actions/pnpm-outputs@c23fac84b4008c769ab5b8547bdd0f582038af7a # main
         with:
           mise-state: ${{ steps.mise.outputs.state }}
           viteplus-state: ${{ steps.viteplus.outputs.state }}
@@ -156,6 +158,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+        exclude: ${{ fromJSON(vars.SKIP_MACOS_E2E == 'true' && '[{"os":"macos-15"}]' || '[]') }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -208,6 +211,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+        exclude: ${{ fromJSON(vars.SKIP_MACOS_E2E == 'true' && '[{"os":"macos-15"}]' || '[]') }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

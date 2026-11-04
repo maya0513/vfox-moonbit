@@ -68,6 +68,26 @@ export async function checkDependencies(
   assert.equal(object(project.engines).node, node, 'Node declaration must match mise');
   assert.equal(project.packageManager, `pnpm@${pnpm}`, 'pnpm declaration must match mise');
   assert.equal(workspace.pmOnFail, 'error', 'Fail on a mismatch in mise-managed pnpm');
+  assert(
+    Number.isSafeInteger(workspace.minimumReleaseAge) &&
+      Number(workspace.minimumReleaseAge) >= 10080,
+    'pnpm must enforce at least a seven-day release age',
+  );
+  assert.equal(workspace.minimumReleaseAgeStrict, true, 'pnpm release-age policy must be strict');
+  assert.equal(
+    workspace.minimumReleaseAgeIgnoreMissingTime,
+    false,
+    'pnpm must reject dependencies without publication timestamps',
+  );
+  assert(
+    workspace.trustLockfile === undefined || workspace.trustLockfile === false,
+    'Keep pnpm lockfile policy verification enabled',
+  );
+  assert.deepEqual(
+    renovate.npm,
+    { lockFileMaintenance: { minimumReleaseAge: null } },
+    'Delegate only pnpm lock maintenance release-age verification to pnpm',
+  );
   const documents = parseAllDocuments(await read('pnpm-lock.yaml'));
   assert(
     documents.every((document) => document.errors.length === 0),
@@ -267,10 +287,12 @@ export async function checkDependencies(
   );
   const runners = ['ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15', 'windows-2025'];
   for (const name of ['mise_e2e', 'vfox_e2e']) {
-    assert.deepEqual(
-      object(object(object(ciJobs[name]).strategy).matrix).os,
-      runners,
-      'Validate all supported runners',
+    const matrix = object(object(object(ciJobs[name]).strategy).matrix);
+    assert.deepEqual(matrix.os, runners, 'Validate all supported runners');
+    assert.equal(
+      matrix.exclude,
+      "${{ fromJSON(vars.SKIP_MACOS_E2E == 'true' && '[{\"os\":\"macos-15\"}]' || '[]') }}",
+      'Allow only the explicit temporary macOS exclusion',
     );
   }
   return { node, pnpm };
