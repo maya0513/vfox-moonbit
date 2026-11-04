@@ -3,6 +3,10 @@ packages:
 
 pmOnFail: error
 
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+
 storeDir: .pnpm-store
 
 overrides:
