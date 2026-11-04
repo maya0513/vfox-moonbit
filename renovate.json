@@ -5,6 +5,11 @@
     "local>maya0513/renovate-config//presets/mise-pnpm",
     "local>maya0513/renovate-config//presets/viteplus"
   ],
+  "npm": {
+    "lockFileMaintenance": {
+      "minimumReleaseAge": null
+    }
+  },
   "packageRules": [
     {
       "matchManagers": ["mise"],

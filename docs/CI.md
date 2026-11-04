@@ -73,7 +73,11 @@ mise tools use exact declarations. Ordinary installations reuse the recorded dep
 
 mise installs Node and pnpm. `engines.node` and `packageManager` in `package.json` declare the same exact versions for Renovate, and CI checks declarations, locks, and executable versions. `pmOnFail: error` rejects an executable that does not match the declaration. The pnpm lockfile also records the selected package-manager dependencies; mise supplies the executable. Lua stays on 5.1; Node type definitions follow the runtime major.
 
-mise itself is deliberately unpinned to verify compatibility with its latest stable release. Locally owned mise installation steps explicitly set mise-action's `minimum_release_age: "0s"` and `cache: false`, selecting the latest stable release without a publication-age delay. The Action code itself remains pinned to a commit SHA.
+Quality checks and E2E verify compatibility with the latest stable mise. Their installation steps explicitly set mise-action's `minimum_release_age: "0s"` and `cache: false`, selecting the latest stable release without a publication-age delay. The Action code itself remains pinned to a commit SHA.
+
+Only dependency preparation and verification use mise 2026.10.25, matching the shared components' validated environment. Version 2026.11.0 stops trusting project lockfile URLs and Conda graphs under `MISE_SAFE=1`, which breaks Conda locked installs. These jobs retain safe mode and the recorded graph; their pinned version can advance once this combination has been verified. [mise change](https://github.com/jdx/mise/pull/15235)
+
+Review mise, Conda, and shared preparation changes each Tuesday. Once a newer mise passes a fresh Conda locked install with `MISE_SAFE=1`, shared generation and verification, and this repository's full CI, remove both preparation-job pins, the tests requiring those pins, and this temporary note together.
 
 Each job's `Record mise version` step runs `mise --version` to log the actual version used. A later rerun of the same commit may use a different mise version, so inspect this log when diagnosing failures. This exception prioritizes latest-mise compatibility while retaining development-tool and dependency locks.
 
@@ -116,7 +120,13 @@ CI composes the same three actions in verify-only mode without App secrets and i
 
 The Vite+ preset is named `viteplus`. Presets follow shared `main`; all shared action and workflow implementations are pinned together to a reviewed full-length SHA. The generated `pnpm-workspace.yaml` is excluded from formatting because shared synchronization owns its scalar formatting. Repository checks parse YAML and validate the store, overrides and peer policy regardless of scalar quote style.
 
-Renovate also refreshes npm locks within declared ranges. pnpm has no additional cooldown configured here: Renovate's seven-day check does not guarantee the age of every transitive dependency or lock-maintenance update. Dependency review and frozen installation remain required. `renovate/artifacts` is diagnostic, not a required check for ordinary PRs.
+Renovate also refreshes npm locks within declared ranges. In `pnpm-workspace.yaml`, `minimumReleaseAge: 10080`, `minimumReleaseAgeStrict: true`, and `minimumReleaseAgeIgnoreMissingTime: false` apply a seven-day delay to pnpm's direct and transitive dependency resolution and reject missing publication timestamps. `trustLockfile` retains its default `false`. The required `pnpm-outputs` step validates effective configuration, including environment overrides, and frozen installation.
+
+For protected pnpm lock maintenance, `npm.lockFileMaintenance.minimumReleaseAge: null` in `renovate.json` delegates the age check to pnpm. Ordinary updates and other managers retain the shared preset's Renovate checks. `renovate/artifacts` is diagnostic and is not a required check for ordinary pull requests.
+
+When generation or installation rejects an exact version that is too young or lacks a publication timestamp, inspect the dependency and wait or regenerate the lock with an eligible version. Urgent security fixes use only reviewed `package@exact-version` entries in `minimumReleaseAgeExclude`, removed after the waiting period. If an exception is added manually on a PR, finish its generated artifacts manually too; a Bot rebase/retry can discard that exception. [Shared migration and exception procedure](https://github.com/maya0513/renovate-config/blob/main/docs/release-age.md)
+
+An exception PR records the target version's publication time and the date it reaches seven days. Remove expired exceptions at the next Tuesday review and verify frozen installation and CI without them.
 
 Lock records contain only the platforms assigned to each group; CI rejects out-of-group entries.
 

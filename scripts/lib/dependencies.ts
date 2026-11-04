@@ -68,6 +68,26 @@ export async function checkDependencies(
   assert.equal(object(project.engines).node, node, 'Node declaration must match mise');
   assert.equal(project.packageManager, `pnpm@${pnpm}`, 'pnpm declaration must match mise');
   assert.equal(workspace.pmOnFail, 'error', 'Fail on a mismatch in mise-managed pnpm');
+  assert(
+    Number.isSafeInteger(workspace.minimumReleaseAge) &&
+      Number(workspace.minimumReleaseAge) >= 10080,
+    'pnpm must enforce at least a seven-day release age',
+  );
+  assert.equal(workspace.minimumReleaseAgeStrict, true, 'pnpm release-age policy must be strict');
+  assert.equal(
+    workspace.minimumReleaseAgeIgnoreMissingTime,
+    false,
+    'pnpm must reject dependencies without publication timestamps',
+  );
+  assert(
+    workspace.trustLockfile === undefined || workspace.trustLockfile === false,
+    'Keep pnpm lockfile policy verification enabled',
+  );
+  assert.deepEqual(
+    renovate.npm,
+    { lockFileMaintenance: { minimumReleaseAge: null } },
+    'Delegate only pnpm lock maintenance release-age verification to pnpm',
+  );
   const documents = parseAllDocuments(await read('pnpm-lock.yaml'));
   assert(
     documents.every((document) => document.errors.length === 0),

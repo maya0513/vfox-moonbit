@@ -24,10 +24,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install current mise
+      - name: Install validated mise for dependency preparation
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5
         with:
-          minimum_release_age: "0s" # Validate the latest stable mise; tools remain locked.
+          # mise 2026.11.0 safe mode rejects the recorded Conda graph (jdx/mise#15235).
+          version: "2026.10.25"
+          minimum_release_age: "0s"
           install: false
           cache: false
           experimental: true

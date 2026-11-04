@@ -61,6 +61,35 @@ describe('dependency automation contract', () => {
     await expect(checkDependencies(root)).resolves.toEqual({ node: NODE, pnpm: PNPM });
   });
 
+  it('accepts a longer pnpm waiting period with lockfile verification enabled', async () => {
+    await change('pnpm-workspace.yaml', 'minimumReleaseAge: 10080', 'minimumReleaseAge: 20160');
+    await change('pnpm-workspace.yaml', 'pmOnFail: error', 'pmOnFail: error\ntrustLockfile: false');
+    await expect(checkDependencies(root)).resolves.toEqual({ node: NODE, pnpm: PNPM });
+  });
+
+  it.each([
+    ['minimumReleaseAge: 10080', '', 'seven-day'],
+    ['minimumReleaseAge: 10080', 'minimumReleaseAge: 60', 'seven-day'],
+    ['minimumReleaseAge: 10080', 'minimumReleaseAge: 10080.5', 'seven-day'],
+    ['minimumReleaseAgeStrict: true', 'minimumReleaseAgeStrict: false', 'strict'],
+    ['minimumReleaseAgeStrict: true', '', 'strict'],
+    [
+      'minimumReleaseAgeIgnoreMissingTime: false',
+      'minimumReleaseAgeIgnoreMissingTime: true',
+      'publication timestamps',
+    ],
+    ['minimumReleaseAgeIgnoreMissingTime: false', '', 'publication timestamps'],
+    ['pmOnFail: error', 'pmOnFail: error\ntrustLockfile: true', 'lockfile policy'],
+  ])('rejects weakened pnpm release-age settings: %s', async (before, after, message) => {
+    await change('pnpm-workspace.yaml', before, after);
+    await expect(checkDependencies(root)).rejects.toThrow(message);
+  });
+
+  it('delegates only npm lock maintenance age checks to the protected pnpm installation', async () => {
+    await change('renovate.json', '"minimumReleaseAge": null', '"minimumReleaseAge": "7 days"');
+    await expect(checkDependencies(root)).rejects.toThrow('pnpm lock maintenance');
+  });
+
   it.each([
     ['node', 'windows-arm64'],
     ['conda:lua', 'windows-x64'],
