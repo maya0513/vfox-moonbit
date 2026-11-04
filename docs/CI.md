@@ -63,6 +63,8 @@ For pull requests, `quality` fails if a `releases/<exact-version>.json` file alr
 
 The repository ruleset treats `required` as the required check. This aggregation keeps the merge condition stable when individual matrix jobs are added or renamed.
 
+When hosted macOS arm64 runners lack capacity, the repository variable `SKIP_MACOS_E2E=true` temporarily excludes macOS from both mise and vfox E2E. Leave it unset normally. After capacity recovers, run `gh variable delete SKIP_MACOS_E2E --repo maya0513/vfox-moonbit` and start a new CI run. Check resumption at the Tuesday review as well. Supported platforms and other CI checks remain in place.
+
 ## Version locks and latest-mise verification
 
 mise tools use exact declarations. Ordinary installations reuse the recorded dependency graph and checksums.

@@ -287,10 +287,12 @@ export async function checkDependencies(
   );
   const runners = ['ubuntu-24.04', 'ubuntu-24.04-arm', 'macos-15', 'windows-2025'];
   for (const name of ['mise_e2e', 'vfox_e2e']) {
-    assert.deepEqual(
-      object(object(object(ciJobs[name]).strategy).matrix).os,
-      runners,
-      'Validate all supported runners',
+    const matrix = object(object(object(ciJobs[name]).strategy).matrix);
+    assert.deepEqual(matrix.os, runners, 'Validate all supported runners');
+    assert.equal(
+      matrix.exclude,
+      "${{ fromJSON(vars.SKIP_MACOS_E2E == 'true' && '[{\"os\":\"macos-15\"}]' || '[]') }}",
+      'Allow only the explicit temporary macOS exclusion',
     );
   }
   return { node, pnpm };

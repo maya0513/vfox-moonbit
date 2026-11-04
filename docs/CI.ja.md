@@ -63,6 +63,8 @@ pnpm vp run e2e:vfox
 
 リポジトリのルールセットでは`required`を必須チェックとして扱います。個別のマトリクスジョブの追加や名前の変更があっても、マージ条件はこの集約ジョブで安定して判定できます。
 
+macOS arm64のhosted runnerが容量不足の場合、リポジトリ変数`SKIP_MACOS_E2E=true`でmise・vfox両方のmacOS E2Eを一時停止できます。通常は未設定とし、容量回復後に`gh variable delete SKIP_MACOS_E2E --repo maya0513/vfox-moonbit`で解除して新しいCIを起動します。火曜日のレビューでも再開状況を確認します。対応OSの宣言と他のCIは維持します。
+
 ## バージョンの固定とmise最新検証
 
 miseのツールはexact版で宣言し、通常のインストールではロックに記録した依存グラフとチェックサムを使います。

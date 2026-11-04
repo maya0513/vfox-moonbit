@@ -246,6 +246,13 @@ describe('dependency automation contract', () => {
     ],
     ['.github/workflows/ci.yml', '"macos-arm64","windows-x64"', '"macos-arm64"', 'groups'],
     ['.github/workflows/ci.yml', 'verify-only: "true"', 'verify-only: "false"', 'read-only'],
+    ['.github/workflows/ci.yml', "vars.SKIP_MACOS_E2E == 'true'", 'true', 'macOS exclusion'],
+    [
+      '.github/workflows/ci.yml',
+      '[{"os":"macos-15"}]',
+      '[{"os":"windows-2025"}]',
+      'macOS exclusion',
+    ],
   ])('rejects policy drift in %s: %s', async (name, before, after, message) => {
     await change(name, before, after);
     await expect(checkDependencies(root)).rejects.toThrow(message);
