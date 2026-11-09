@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "devDependencies": {
-    "@types/node": "^24.19.1",
+    "@types/node": "^26.6.6",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@vitest/coverage-v8": "5.0.5",
@@ -16,7 +16,7 @@
     "yazl": "^3.3.1"
   },
   "engines": {
-    "node": "24.22.2"
+    "node": "26.13.0"
   },
   "packageManager": "pnpm@12.17.0"
 }
