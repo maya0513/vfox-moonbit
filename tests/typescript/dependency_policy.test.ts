@@ -136,7 +136,7 @@ describe('dependency automation contract', () => {
       'Conda',
     ],
     ['renovate.json', '>=5.1.0 <5.2.0', '>=5.0.0 <6.0.0', 'Lua 5.1'],
-    ['renovate.json', '>=24.0.0 <25.0.0', '>=25.0.0 <26.0.0', 'Node types'],
+    ['renovate.json', '>=26.0.0 <27.0.0', '>=27.0.0 <28.0.0', 'Node types'],
     [
       'renovate.json',
       'local>maya0513/renovate-config//presets/mise-pnpm',
