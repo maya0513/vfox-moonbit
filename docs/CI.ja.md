@@ -110,7 +110,7 @@ E2E、配布元の最新版検出、リリースはネットワークや外部�
 
 ## 開発ツールと依存の更新
 
-[Renovate設定](../renovate.json)はmaya0513/renovate-configの共通defaultとVite+ presetを継承します。更新は日本時間の火曜日、公開後7日の待機を経て提案されます。non-majorとロック保守は必須CIと必要なCODEOWNERS承認を満たせば自動マージし、major、runner環境、共通ワークフロー参照の変更は手動で確認します。火曜日は更新を受け付ける期間であり、実行時刻やPRが一つになることを保証するものではありません。
+[Renovate設定](../renovate.json)はmaya0513/renovate-configの共通defaultとVite+ presetを継承します。更新は日本時間の火曜日、公開後7日の待機を経て提案されます。non-majorとロック保守は必須CIを満たせば自動マージし、major、runner環境、共通ワークフロー参照の変更は手動で確認します。火曜日は更新を受け付ける期間であり、実行時刻やPRが一つになることを保証するものではありません。
 
 npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpmは、それぞれmiseとpackage.jsonの宣言を同じPRで更新します。共通mise-pnpmプリセットがRenovate自身のmise生成物更新とロック保守を無効にし、miseロックは共通mise準備アクションに集約します。独立したVite+プリセットも選択し、派生依存の宣言同期をVite+準備アクションへ任せます。pnpm更新のnpm生成処理は有効のままにし、package manager用のロック文書もRenovateが更新します。アクションは省略しないコミットSHAへ固定し、対応バージョンをコメントで記録します。承認済みの共通アクションと公開ワークフローは同じSHA固定と`# main`を使います。miseの最低版とvfoxのランタイム下限は別途手動で判断します。
 
@@ -159,12 +159,12 @@ npmのロック保守は宣言範囲内で行います。`pnpm-workspace.yaml`�
 | Variable | `MOONBIT_UPDATER_CLIENT_ID` | リポジトリ専用GitHub AppのクライアントID |
 | Secret | `MOONBIT_UPDATER_PRIVATE_KEY` | Appトークン生成に使う秘密鍵 |
 | Repository setting | Dependency graph | PRの依存関係レビューに必要。Settings → Advanced Securityで有効化 |
-| Repository setting | Allow auto-merge | 自動マージ対象のMoonBit・Renovate PRを必須チェックと承認後にスカッシュマージ |
+| Repository setting | Allow auto-merge | 自動マージ対象のMoonBit・Renovate PRを必須チェック通過後にスカッシュマージ |
 | Ruleset | Required check `required` | CIグループが一つでも失敗した変更のマージを防止 |
 
 リポジトリ専用GitHub AppにはMetadata read、Contents write、Pull requests writeを付与し、ルールセットの迂回権限は与えません。アクションの更新はRenovate自身のAppが担当するため、Workflows writeは要求しません。共通ワークフローの公開ジョブはContents writeだけを要求し、PRの検証にはApp認証情報を渡しません。Issue作成、履歴の参照、リリースには各ワークフローの制限付きGITHUB_TOKENを使います。
 
-導入後はUpdate Lua test dependenciesを手動実行し、変更があれば作られたPRを確認します。実際のRenovate更新では、同期が無関係な変更を作らないことと、追加コミットの最新SHAでCIが再実行されることを確認します。CODEOWNERS承認、必須チェック、最新mainへの追従条件は維持します。
+導入後はUpdate Lua test dependenciesを手動実行し、変更があれば作られたPRを確認します。実際のRenovate更新では、同期が無関係な変更を作らないことと、追加コミットの最新SHAでCIが再実行されることを確認します。必須チェック、最新mainへの追従条件は維持します。
 
 ## 失敗時の確認
 

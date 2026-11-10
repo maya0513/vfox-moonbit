@@ -110,7 +110,7 @@ A normal updater PR may change only `releases/*.json`. The workflow allowlist re
 
 ## Updating development tools and dependencies
 
-[Renovate configuration](../renovate.json) inherits the shared default and Vite+ presets from maya0513/renovate-config. Renovate proposes updates on Tuesdays in Asia/Tokyo after a seven-day release-age check. Non-major updates and lock maintenance may auto-merge after required CI and any required CODEOWNERS approval; major updates, runner changes, and shared-workflow revisions require manual review. This is an update window, not a guarantee of a single PR or a precise execution time.
+[Renovate configuration](../renovate.json) inherits the shared default and Vite+ presets from maya0513/renovate-config. Renovate proposes updates on Tuesdays in Asia/Tokyo after a seven-day release-age check. Non-major updates and lock maintenance may auto-merge after required CI; major updates, runner changes, and shared-workflow revisions require manual review. This is an update window, not a guarantee of a single PR or a precise execution time.
 
 Renovate selects npm, mise, and GitHub Action versions. Node and pnpm declarations in mise and package.json are grouped by tool. The shared mise-pnpm preset disables Renovate's own mise artifact generation and lock maintenance, leaving mise locks to the shared mise preparation action. The independent Vite+ preset delegates derived declarations to the Vite+ preparation action. Native npm artifact generation stays enabled for pnpm updates, including its package-manager lock document. Actions remain pinned by full-length commit SHA, with a version comment; the approved shared actions and publishing workflow use the same SHA with a `# main` comment. The minimum supported mise and vfox runtime versions are reviewed separately.
 
@@ -159,12 +159,12 @@ The repository requires the following Actions configuration:
 | Variable | `MOONBIT_UPDATER_CLIENT_ID` | Client ID of the repository-specific GitHub App |
 | Secret | `MOONBIT_UPDATER_PRIVATE_KEY` | Private key used to mint an App token |
 | Repository setting | Dependency graph | Required for the pull-request dependency review; enable under Settings → Advanced Security |
-| Repository setting | Allow auto-merge | Squash-merges eligible MoonBit and Renovate PRs after required checks and approvals |
+| Repository setting | Allow auto-merge | Squash-merges eligible MoonBit and Renovate PRs after required checks pass |
 | Ruleset | Required check `required` | Prevents merging when any CI group fails |
 
 Install the repository-specific GitHub App with Metadata read, Contents write and Pull requests write, without a ruleset bypass. Workflows write is no longer requested: Renovate's own App updates Action pins. The shared artifact publisher requests only Contents write; PR validation receives no App credentials. Issue creation, workflow-history inspection and releases use the relevant workflow's restricted GITHUB_TOKEN.
 
-After deployment, manually run Update Lua test dependencies and inspect any resulting PR. On a real Renovate update, confirm that artifact synchronization produces no unrelated diff and that CI runs on the latest follow-up commit. Existing CODEOWNERS approval, required checks and up-to-date branch rules remain in force.
+After deployment, manually run Update Lua test dependencies and inspect any resulting PR. On a real Renovate update, confirm that artifact synchronization produces no unrelated diff and that CI runs on the latest follow-up commit. Existing required checks and up-to-date branch rules remain in force.
 
 ## Investigating failures
 
