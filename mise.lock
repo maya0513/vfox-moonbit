@@ -408,32 +408,32 @@ url = "https://github.com/JohnnyMorganz/StyLua/releases/download/v2.6.0/stylua-w
 url_api = "https://api.github.com/repos/JohnnyMorganz/StyLua/releases/assets/628186216"
 
 [[tools.vfox]]
-version = "1.0.13"
+version = "1.1.0"
 backend = "aqua:version-fox/vfox"
-specifiers = ["1.0.13"]
+specifiers = ["1.1.0"]
 
 [tools.vfox."platforms.linux-arm64"]
-checksum = "sha256:7cec88e6e9be551cb138e061d37521286d34096fdc0c4fdb65d89cef30c58583"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_linux_aarch64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211190"
+checksum = "sha256:e702e057dfe588200727dfb3cf786d181b13f015cbcc9e13679a3edcfd07e430"
+url = "https://github.com/version-fox/vfox/releases/download/v1.1.0/vfox_1.1.0_linux_aarch64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/720386771"
 provenance = "cosign"
 
 [tools.vfox."platforms.linux-x64"]
-checksum = "sha256:7ad0a4c82c8173f09393e09abecc3e27468253bab5fe53ffbf58f2b12b3fc768"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_linux_x86_64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211282"
+checksum = "sha256:3b33c3c468b27bc17aecf0d6d3af24fe49fe204972984904a136a47b402a0ee4"
+url = "https://github.com/version-fox/vfox/releases/download/v1.1.0/vfox_1.1.0_linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/720386837"
 provenance = "cosign"
 
 [tools.vfox."platforms.macos-arm64"]
-checksum = "sha256:9f040c5b2cef37c0ce4fb772e552b52be0ed1bcd9b63d2c6aaf4d59f5cc99a05"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_macos_aarch64.tar.gz"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211191"
+checksum = "sha256:9beb733ad636966c6d410c768407c63ffb350106eb23a8151d6fc80b9e84248e"
+url = "https://github.com/version-fox/vfox/releases/download/v1.1.0/vfox_1.1.0_macos_aarch64.tar.gz"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/720386802"
 provenance = "cosign"
 
 [tools.vfox."platforms.windows-x64"]
-checksum = "sha256:dab9f12aa1139eb4a055afccbfa2b970b389e1fd3f14c94e9e6793ae5fc66e0a"
-url = "https://github.com/version-fox/vfox/releases/download/v1.0.13/vfox_1.0.13_windows_x86_64.zip"
-url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/649211252"
+checksum = "sha256:1bbec8fffddbb62de0d93030c3f6203c69680662bc65257ca4a5e611cb607d0a"
+url = "https://github.com/version-fox/vfox/releases/download/v1.1.0/vfox_1.1.0_windows_x86_64.zip"
+url_api = "https://api.github.com/repos/version-fox/vfox/releases/assets/720386834"
 provenance = "cosign"
 
 [[tools.zizmor]]
