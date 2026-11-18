@@ -241,7 +241,7 @@ jobs:
           if [[ -z "$number" ]]; then
             gh pr create --base main --head "$branch" \
               --title "chore: review MoonBit upstream drift" \
-              --body "Automation stopped safely. Review upstream/MANUAL_REVIEW.md, update the pinned recipe and tests as needed, and merge only after CODEOWNERS approval and full CI. This PR is never auto-merged."
+              --body "Automation stopped safely. Review upstream/MANUAL_REVIEW.md, update the pinned recipe and tests as needed, and merge only after maintainer review and full CI. This PR is never auto-merged."
           fi
 
       - name: Create or update the single updater pull request
