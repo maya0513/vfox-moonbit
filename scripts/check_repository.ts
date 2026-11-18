@@ -245,9 +245,7 @@ export async function checkActions(repository: string): Promise<void> {
           !/^ {10}cache: false$/m.test(step) ||
           !versionMatches
         ) {
-          throw new RepositoryError(
-            'mise-action must explicitly select the latest stable mise',
-          );
+          throw new RepositoryError('mise-action must explicitly select the latest stable mise');
         }
       }
     }
