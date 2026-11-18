@@ -236,24 +236,17 @@ export async function checkActions(repository: string): Promise<void> {
     }
     let miseCount = 0;
     for (const job of text.split(/(?=^ {2}[\w-]+:[ \t]*$)/m)) {
-      const preparation =
-        (path.endsWith('/ci.yml') && /^ {2}dependency_artifacts:/m.test(job)) ||
-        (path.endsWith('/update-dependencies.yml') && /^ {2}prepare:/m.test(job));
       for (const step of job.split(/(?=^ {6}- )/m)) {
         if (!/^ {8}uses:\s*jdx\/mise-action@/m.test(step)) continue;
         miseCount += 1;
-        const versionMatches = preparation
-          ? /^ {10}version: "2026\.10\.25"$/m.test(step)
-          : !/^ {10}version:/m.test(step);
+        const versionMatches = !/^ {10}version:/m.test(step);
         if (
           !/^ {10}minimum_release_age: "0s"(?:\s+#.*)?$/m.test(step) ||
           !/^ {10}cache: false$/m.test(step) ||
           !versionMatches
         ) {
           throw new RepositoryError(
-            preparation
-              ? 'Dependency preparation must use the validated mise 2026.10.25'
-              : 'mise-action must explicitly select the latest stable mise',
+            'mise-action must explicitly select the latest stable mise',
           );
         }
       }

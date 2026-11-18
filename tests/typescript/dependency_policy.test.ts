@@ -231,7 +231,7 @@ describe('dependency automation contract', () => {
       'missing-key:',
       'App credentials',
     ],
-    ['.github/workflows/ci.yml', '"verify":"locked"', '"verify":"regenerate"', 'groups'],
+    ['.github/workflows/ci.yml', '"verify":"regenerate"', '"verify":"locked"', 'groups'],
     [
       '.github/workflows/ci.yml',
       '"conda:gcc","conda:lua","conda:luarocks"',
