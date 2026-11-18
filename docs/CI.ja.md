@@ -75,11 +75,7 @@ miseのツールはexact版で宣言し、通常のインストールではロ�
 
 Nodeとpnpmの取得はmiseが担当します。Renovate向けに`package.json`の`engines.node`と`packageManager`にも同じexact版を宣言し、宣言・ロック・実行版の一致をCIで検証します。`pmOnFail: error`により宣言と異なる実行版を拒否します。pnpmのlockfileにも選択済みpackage managerの依存を記録しますが、実行ファイルの取得はmiseが担当します。Luaは5.1系を維持し、Nodeの型定義は実行版と同じメジャーに揃えます。
 
-品質検査とE2Eはmiseの最新安定版との互換性を確認します。mise-actionの`minimum_release_age: "0s"`と`cache: false`を明示し、公開からの待機時間を設けず最新安定版を取得します。アクション自体のコードはコミットSHAへ固定します。
-
-依存生成・検証の準備ジョブだけは、共通部品の検証済み環境に合わせてmise 2026.10.25を使います。2026.11.0では`MISE_SAFE=1`時にプロジェクトのロックURLとCondaグラフを信頼しない変更が入り、Condaのlocked installが失敗するためです。安全モードと記録済みグラフを維持し、この組み合わせが動作する版を確認してから準備ジョブの固定版を更新します。[miseの変更](https://github.com/jdx/mise/pull/15235)
-
-毎週火曜日のレビューでmise・Conda・共通準備処理の追従状況を確認します。新しいmiseの空のインストール先で`MISE_SAFE=1`とCondaのlocked installが成功し、共通の依存生成・検証と本リポジトリの全CIも通った時点で、2つの準備ジョブの固定、固定を要求するテスト、この注意書きをまとめて削除します。
+全ジョブでmiseの最新安定版との互換性を確認します。mise-actionの`minimum_release_age: "0s"`と`cache: false`を明示し、公開からの待機時間を設けず最新安定版を取得します。アクション自体のコードはコミットSHAへ固定します。
 
 各ジョブの`Record mise version`ステップは`mise --version`を実行し、実際に使った版をログへ残します。同じコミットでも後日の再実行ではmiseの版が変わり得るため、失敗を調べる際はこのログも確認します。これは最新miseとの互換性を優先する例外であり、開発ツールや依存の固定は引き続き維持します。
 
@@ -118,7 +114,7 @@ npm、mise、GitHub Actionsの更新版はRenovateが選びます。Nodeとpnpm�
 
 専用の公開ジョブが`publish-pnpm-artifacts.yml`を呼び、検証済みのbase SHA・変更有無・変更不能なartifact IDを渡します。miseとVite+の生成物を明示的に許可し、このジョブだけに既存のApp認証情報を渡します。公開処理はパッチを検査し、元のSHAを条件とするlease付きで必要な場合だけ追加の1コミットをプッシュします。Appのプッシュでは再生成せず、PRのCIが最新SHAを検証します。
 
-通常CIも同じ3つのアクションを検証モードで実行し、結果を`required`に含めます。Appの認証情報は渡しません。両方の呼び出しで、Conda GCC／Lua／LuaRocksはLinux x64／arm64、その他はLinux x64／arm64・macOS arm64・Windows x64を指定します。Condaは記録済みの依存をインストールし、通常CIでは再解決しません。その他は選択済みexact版から再生成して差分を確認します。ツールの漏れ・重複、対象環境の不足、共通リビジョンの不一致、準備状態や公開出力の接続漏れ、準備への認証情報の混入も設定検査で拒否します。
+通常CIも同じ3つのアクションを検証モードで実行し、結果を`required`に含めます。Appの認証情報は渡しません。両方の呼び出しで、Conda GCC／Lua／LuaRocksはLinux x64／arm64、その他はLinux x64／arm64・macOS arm64・Windows x64を指定します。両グループとも選択済みexact版から再生成し、記録済みロックとの差分を確認します。Condaは、mise 2026.11で`MISE_SAFE=1`時にプロジェクトのロックURLとCondaグラフを信頼しなくなったため、記録済みグラフのインストールではなく再解決で検証します。[miseの変更](https://github.com/jdx/mise/pull/15235)ツールの漏れ・重複、対象環境の不足、共通リビジョンの不一致、準備状態や公開出力の接続漏れ、準備への認証情報の混入も設定検査で拒否します。
 
 Vite+のプリセット名は`viteplus`です。プリセットは共通`main`を追従し、共通アクションと公開ワークフローの実装は同じレビュー済みの省略しないコミットSHAに固定します。生成される`pnpm-workspace.yaml`の値の書式は共通同期処理に任せ、フォーマッターの対象から外します。リポジトリ検査はYAMLを解析し、引用符の違いによらずstore・override・peer policyを検証します。
 

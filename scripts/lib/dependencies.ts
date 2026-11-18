@@ -250,7 +250,7 @@ export async function checkDependencies(
         .filter((name) => name.startsWith('conda:'))
         .toSorted(),
       platforms: linux,
-      verify: 'locked',
+      verify: 'regenerate',
     },
     {
       lockfile: 'mise.lock',
