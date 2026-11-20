@@ -1,0 +1,55 @@
+{
+  "platforms": {
+    "darwin-aarch64": {
+      "core": {
+        "format": "tar.gz",
+        "sha256": "a22977f3d346e4a189fe521b2d265b2fbb6c00e3ff80342246fb6f8f26c9f156",
+        "url": "https://cli.moonbitlang.com/cores/core-0.10.22%2B124d61d05.tar.gz"
+      },
+      "toolchain": {
+        "format": "tar.gz",
+        "sha256": "5c57025f0db4a90261eebeb880e542003cdae05033b9506233e282586f81329a",
+        "url": "https://cli.moonbitlang.com/binaries/0.10.22%2B124d61d05/moonbit-darwin-aarch64.tar.gz"
+      }
+    },
+    "linux-aarch64": {
+      "core": {
+        "format": "tar.gz",
+        "sha256": "a22977f3d346e4a189fe521b2d265b2fbb6c00e3ff80342246fb6f8f26c9f156",
+        "url": "https://cli.moonbitlang.com/cores/core-0.10.22%2B124d61d05.tar.gz"
+      },
+      "toolchain": {
+        "format": "tar.gz",
+        "sha256": "83a5d254c61ec04318c1829dc309b21ab25baee7402e164538775371c40ea5b1",
+        "url": "https://cli.moonbitlang.com/binaries/0.10.22%2B124d61d05/moonbit-linux-aarch64.tar.gz"
+      }
+    },
+    "linux-x86_64": {
+      "core": {
+        "format": "tar.gz",
+        "sha256": "a22977f3d346e4a189fe521b2d265b2fbb6c00e3ff80342246fb6f8f26c9f156",
+        "url": "https://cli.moonbitlang.com/cores/core-0.10.22%2B124d61d05.tar.gz"
+      },
+      "toolchain": {
+        "format": "tar.gz",
+        "sha256": "aeb78ded1d5e25185ed788328cacef5e843a9ab923145523b7652e8d082f74fb",
+        "url": "https://cli.moonbitlang.com/binaries/0.10.22%2B124d61d05/moonbit-linux-x86_64.tar.gz"
+      }
+    },
+    "windows-x86_64": {
+      "core": {
+        "format": "zip",
+        "sha256": "2ce9e6112f2db09eeb52c7865459df3de27e42badb6be26db77347187ab8fbfe",
+        "url": "https://cli.moonbitlang.com/cores/core-0.10.22%2B124d61d05.zip"
+      },
+      "toolchain": {
+        "format": "zip",
+        "sha256": "8e552848a5c06dcce6bab725687562a689397948b7144e9087e9ffa4c1d38be4",
+        "url": "https://cli.moonbitlang.com/binaries/0.10.22%2B124d61d05/moonbit-windows-x86_64.zip"
+      }
+    }
+  },
+  "recipe": 1,
+  "schema": 1,
+  "version": "0.10.22+124d61d05"
+}
