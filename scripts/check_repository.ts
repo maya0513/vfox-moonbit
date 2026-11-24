@@ -373,7 +373,7 @@ export async function checkMaintenanceTooling(repository: string): Promise<void>
     JSON.stringify(workspace.packages) !== JSON.stringify(['.']) ||
     workspace.storeDir !== '.pnpm-store' ||
     workspace.overrides['vitest@*'] !== coverageVersion ||
-    !/^npm:@voidzero-dev\/vite-plus-core@1\.\d+\.\d+$/.test(
+    !/^npm:@voidzero-dev\/vite-plus-core@\d+\.\d+\.\d+$/.test(
       String(workspace.overrides['vite@*']),
     ) ||
     workspace.peerDependencyRules.allowedVersions.vite !== '1'
