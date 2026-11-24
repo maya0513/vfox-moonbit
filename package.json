@@ -16,7 +16,7 @@
     "yazl": "^3.3.1"
   },
   "engines": {
-    "node": "26.13.0"
+    "node": "26.13.1"
   },
   "packageManager": "pnpm@12.19.0"
 }
