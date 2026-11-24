@@ -290,7 +290,7 @@ describe('Node maintenance tooling policy', () => {
   it.each([
     ["  - '.'", "  - 'other'"],
     ['storeDir: .pnpm-store', 'storeDir: other'],
-    ['vite-plus-core@1.', 'vite-plus-core@2.'],
+    ['vite-plus-core@', 'vite-plus-core@^'],
   ])('rejects workspace policy drift: %s', async (before, after) => {
     await makeMaintenanceConfiguration(temporary);
     const path = join(temporary, 'pnpm-workspace.yaml');
