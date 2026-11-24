@@ -37,7 +37,7 @@ jobs:
 
       - name: Prepare mise locks and Node toolchain
         id: mise
-        uses: maya0513/renovate-config/.github/actions/mise-pnpm@ea49e2e07bd37f6a3d14161c09c1d49a074333e0 # main
+        uses: maya0513/renovate-config/.github/actions/mise-pnpm@889cf8d301e54506dee326511ffa5dcdcce2b53f # main
         with:
           verify-only: "false"
           lock-groups: >-
@@ -46,13 +46,13 @@ jobs:
 
       - name: Synchronize the selected Vite+ dependency graph
         id: viteplus
-        uses: maya0513/renovate-config/.github/actions/pnpm-viteplus@ea49e2e07bd37f6a3d14161c09c1d49a074333e0 # main
+        uses: maya0513/renovate-config/.github/actions/pnpm-viteplus@889cf8d301e54506dee326511ffa5dcdcce2b53f # main
         with:
           preparation-state: ${{ steps.mise.outputs.state }}
 
       - name: Validate dependency outputs
         id: outputs
-        uses: maya0513/renovate-config/.github/actions/pnpm-outputs@ea49e2e07bd37f6a3d14161c09c1d49a074333e0 # main
+        uses: maya0513/renovate-config/.github/actions/pnpm-outputs@889cf8d301e54506dee326511ffa5dcdcce2b53f # main
         with:
           mise-state: ${{ steps.mise.outputs.state }}
           viteplus-state: ${{ steps.viteplus.outputs.state }}
@@ -64,7 +64,7 @@ jobs:
 
   publish:
     needs: prepare
-    uses: maya0513/renovate-config/.github/workflows/publish-pnpm-artifacts.yml@ea49e2e07bd37f6a3d14161c09c1d49a074333e0 # main
+    uses: maya0513/renovate-config/.github/workflows/publish-pnpm-artifacts.yml@889cf8d301e54506dee326511ffa5dcdcce2b53f # main
     with:
       base: ${{ needs.prepare.outputs.base }}
       changed: ${{ needs.prepare.outputs.changed }}
