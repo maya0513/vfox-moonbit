@@ -94,13 +94,18 @@ local function client(documents, overrides)
 end
 
 describe("MoonBit release manifest", function()
-    it("accepts only strict pre-1.0 exact versions", function()
+    it("accepts only strict exact versions", function()
         assert.is_true(Manifest.is_exact_version("0.0.0+a"))
         assert.is_true(Manifest.is_exact_version("0.10.11+abc.DEF-1_2"))
+        assert.is_true(Manifest.is_exact_version("1.0.0+a"))
+        assert.is_true(Manifest.is_exact_version("1.0.0-rc1+3c0520448"))
         assert.is_false(Manifest.is_exact_version(nil))
         for _, invalid in ipairs({
             "latest",
-            "1.0.0+a",
+            "2.0.0+a",
+            "1.0.0-rc1",
+            "1.0.0-01+a",
+            "1.0.0-rc..1+a",
             "0.01.0+a",
             "0.1.01+a",
             "0.1",
@@ -186,7 +191,7 @@ describe("MoonBit release manifest", function()
                 document.recipe = 2
             end,
             function(document)
-                document.version = "1.0.0+a"
+                document.version = "2.0.0+a"
             end,
             function(document)
                 document.manifest = "other.json"

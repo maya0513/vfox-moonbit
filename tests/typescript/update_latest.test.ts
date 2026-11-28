@@ -109,8 +109,10 @@ async function makeLocalRepository(repository: string): Promise<Record<string, u
 }
 
 describe('version and JSON helpers', () => {
-  it('encodes exact pre-1.0 versions and creates canonical pointers', () => {
+  it('encodes exact versions and creates canonical pointers', () => {
     expect(encodeVersion('0.10.2+abc-def.1')).toBe('0.10.2%2Babc-def.1');
+    expect(encodeVersion('1.0.0+abc')).toBe('1.0.0%2Babc');
+    expect(encodeVersion('1.0.0-rc1+3c0520448')).toBe('1.0.0-rc1%2B3c0520448');
     expect(latestPointer('0.1.0+a')).toEqual({
       manifest: '0.1.0+a.json',
       recipe: 1,
@@ -125,7 +127,9 @@ describe('version and JSON helpers', () => {
 
   it.each([
     'latest',
-    '1.0.0+abc',
+    '2.0.0+abc',
+    '1.0.0-rc1',
+    '1.0.0-01+abc',
     '0.01.0+abc',
     '0.1.01+abc',
     '0.1',
