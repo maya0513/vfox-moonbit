@@ -4,7 +4,7 @@ This document describes the guarantees enforced by the current tests and impleme
 
 ## Public contract
 
-The only channel exposed through vfox is `latest`. `Available` fetches `releases/latest.json` and returns an exact version in `0.x.y+build-id` form. `PreInstall` accepts only `latest` or an exact version and returns the official toolchain URL and SHA-256 from the corresponding immutable manifest.
+The only channel exposed through vfox is `latest`. `Available` fetches `releases/latest.json` and returns an exact version in `x.y.z[-prerelease]+build-id` form (major 0 or 1). `PreInstall` accepts only `latest` or an exact version and returns the official toolchain URL and SHA-256 from the corresponding immutable manifest.
 
 This document calls a manifest for an exact version an exact manifest. A schema version 1 exact manifest contains `schema`, `recipe`, `version`, and a record for each of these platforms:
 
@@ -65,7 +65,7 @@ After retrieving artifacts for every platform, it checks `latest` again and veri
 | State | Treatment | Exit code |
 | --- | --- | --- |
 | Some platforms have not been published | Defer promotion until the next run | `0` |
-| Installer, layout, version schema, or MoonBit 1.0 change detected | Require manual review | `2` |
+| Installer, layout, version schema change, or a new major version detected | Require manual review | `2` |
 | Any other error | Fail the run | `1` |
 
 The scheduled GitHub Actions workflow runs once a day. It uses a GitHub App token to create a PR limited to `releases/**`, then enables auto-merge after required CI passes. It never pushes directly to `main` and rejects changes to an existing exact manifest.

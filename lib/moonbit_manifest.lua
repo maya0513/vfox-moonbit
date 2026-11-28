@@ -21,12 +21,35 @@ local function is_uint(value)
     return value == "0" or (value and value:match("^[1-9]%d*$") ~= nil)
 end
 
+local function is_prerelease(value)
+    if value == nil then
+        return true
+    end
+    for identifier in (value .. "."):gmatch("(.-)%.") do
+        if identifier:match("^[%w][%w%-]*$") == nil then
+            return false
+        end
+        if identifier:match("^%d+$") ~= nil and not is_uint(identifier) then
+            return false
+        end
+    end
+    return true
+end
+
 function M.is_exact_version(version)
     if type(version) ~= "string" then
         return false
     end
-    local major, minor, patch, build = version:match("^(%d+)%.(%d+)%.(%d+)%+([%w][%w._%-]*)$")
-    return major == "0" and is_uint(minor) and is_uint(patch) and build ~= nil
+    local major, minor, patch, prerelease, build =
+        version:match("^(%d+)%.(%d+)%.(%d+)%-([%w][%w._%-]*)%+([%w][%w._%-]*)$")
+    if major == nil then
+        major, minor, patch, build = version:match("^(%d+)%.(%d+)%.(%d+)%+([%w][%w._%-]*)$")
+    end
+    return (major == "0" or major == "1")
+        and is_uint(minor)
+        and is_uint(patch)
+        and is_prerelease(prerelease)
+        and build ~= nil
 end
 
 function M.encode_version(version)
@@ -73,7 +96,7 @@ local function validate_common(document)
         error("unsupported MoonBit installation recipe: " .. tostring(document.recipe))
     end
     if not M.is_exact_version(document.version) then
-        error("manifest contains an invalid or non-pre-1.0 MoonBit version")
+        error("manifest contains an invalid MoonBit version")
     end
 end
 
@@ -105,7 +128,7 @@ end
 
 function M:exact(version)
     if not M.is_exact_version(version) then
-        error("MoonBit accepts only 'latest' or an exact 0.x.y+build-id version")
+        error("MoonBit accepts only 'latest' or an exact x.y.z[-prerelease]+build-id version")
     end
     local document = self:_fetch(self.base_url .. "/" .. M.encode_version(version) .. ".json")
     validate_common(document)
@@ -143,7 +166,7 @@ function M:resolve(requested)
     end
     if not M.is_exact_version(requested) then
         error(
-            "MoonBit accepts only 'latest' or an exact 0.x.y+build-id version; "
+            "MoonBit accepts only 'latest' or an exact x.y.z[-prerelease]+build-id version; "
                 .. "ranges and partial versions are unsupported"
         )
     end
