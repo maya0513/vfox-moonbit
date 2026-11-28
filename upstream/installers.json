@@ -1,7 +1,7 @@
 {
   "files": {
     "powershell": {
-      "sha256": "a5101e91ffa9905fb25cd009b9a4aa942971a294bd055c89836e3af89b710c64",
+      "sha256": "1b36c041bb5089a579a4ced44f0b8f1d8c21caddcb5a980bc31027955f9b720a",
       "url": "https://cli.moonbitlang.com/install/powershell.ps1"
     },
     "unix": {
